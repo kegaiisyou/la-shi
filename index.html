@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>拉屎大作战</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(160deg, #f6e7c8 0%, #e8c99a 100%);
+    display: flex; align-items: center; justify-content: center;
+    user-select: none;
+  }
+  #game {
+    width: min(100vw, 480px); height: min(100vh, 800px);
+    position: relative; display: flex; flex-direction: column;
+    align-items: center; justify-content: space-between;
+    padding: 24px 16px 40px;
+  }
+  h1 { margin: 0; font-size: 26px; color: #6b4a2f; letter-spacing: 2px; }
+  .sub { font-size: 13px; color: #9c7c56; margin-top: 4px; }
+  .score-box { text-align: center; margin-top: 18px; }
+  .score { font-size: 56px; font-weight: 800; color: #5a3a1e; line-height: 1; }
+  .score-label { font-size: 12px; color: #9c7c56; }
+  .poop {
+    font-size: 92px; line-height: 1; cursor: pointer;
+    filter: drop-shadow(0 8px 6px rgba(90,58,30,.25));
+    transition: transform .08s;
+    margin: 8px 0;
+  }
+  .poop:active { transform: scale(.88) rotate(-6deg); }
+  .bar-wrap { width: 100%; max-width: 320px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #8a6a48; margin-bottom: 6px; }
+  .bar { height: 14px; background: #d9bb90; border-radius: 10px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#c98a3c,#e0a94f); transition: width .15s; }
+  .btns { display: flex; gap: 12px; margin-top: 8px; }
+  button {
+    border: 0; border-radius: 12px; padding: 12px 22px; font-size: 15px;
+    background: #6b4a2f; color: #fff; cursor: pointer;
+  }
+  button.ghost { background: transparent; color: #6b4a2f; border: 2px solid #6b4a2f; }
+  button:active { transform: scale(.95); }
+  .msg { min-height: 20px; font-size: 13px; color: #9c7c56; text-align: center; }
+</style>
+</head>
+<body>
+<div id="game">
+  <div style="text-align:center">
+    <h1>💩 拉屎大作战</h1>
+    <div class="sub">点一点，攒便便，冲上排行榜</div>
+  </div>
+
+  <div class="score-box">
+    <div class="score" id="score">0</div>
+    <div class="score-label">累计便便</div>
+  </div>
+
+  <div class="poop" id="poop" role="button" aria-label="点击拉屎">💩</div>
+
+  <div class="bar-wrap">
+    <div class="bar-label"><span>升级进度</span><span id="lv">Lv.1</span></div>
+    <div class="bar"><i id="bar"></i></div>
+  </div>
+
+  <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
+  <div class="btns">
+    <button id="reset" class="ghost">重新开始</button>
+    <button id="login">登录 / 注册</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var score = 0, lv = 1, best = 0;
+  var $ = function (id) { return document.getElementById(id); };
+
+  function need(n) { return 10 * n * n; }
+  function render() {
+    $('score').textContent = score;
+    $('lv').textContent = 'Lv.' + lv;
+    $('bar').style.width = Math.min(100, (score - need(lv - 1)) / (need(lv) - need(lv - 1)) * 100) + '%';
+    $('best').textContent = best;
+  }
+
+  $('poop').addEventListener('click', function () {
+    score++;
+    if (score > best) { best = score; try { localStorage.setItem('ls_best', best); } catch (e) {} }
+    while (score >= need(lv)) { lv++; $('msg').textContent = '升级啦！Lv.' + lv; }
+    render();
+  });
+
+  $('reset').addEventListener('click', function () {
+    score = 0; lv = 1; $('msg').textContent = '重新开始'; render();
+  });
+
+  $('login').addEventListener('click', function () {
+    $('msg').textContent = '登录功能待接入（见 README）';
+  });
+
+  try { best = parseInt(localStorage.getItem('ls_best') || '0', 10) || 0; } catch (e) {}
+  render();
+})();
+</script>
+</body>
+</html>
