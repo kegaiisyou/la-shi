@@ -11,45 +11,86 @@
     font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
     background: linear-gradient(160deg, #f6e7c8 0%, #e8c99a 100%);
     display: flex; align-items: center; justify-content: center;
-    user-select: none;
+    user-select: none; color: #5a3a1e;
   }
   #game {
     width: min(100vw, 480px); height: min(100vh, 800px);
     position: relative; display: flex; flex-direction: column;
     align-items: center; justify-content: space-between;
-    padding: 24px 16px 40px;
+    padding: 20px 16px 28px;
   }
-  h1 { margin: 0; font-size: 26px; color: #6b4a2f; letter-spacing: 2px; }
+  .head { width: 100%; text-align: center; }
+  h1 { margin: 0; font-size: 26px; letter-spacing: 2px; }
   .sub { font-size: 13px; color: #9c7c56; margin-top: 4px; }
-  .score-box { text-align: center; margin-top: 18px; }
-  .score { font-size: 56px; font-weight: 800; color: #5a3a1e; line-height: 1; }
+  .userbar {
+    width: 100%; display: flex; align-items: center; justify-content: space-between;
+    font-size: 12px; color: #8a6a48; margin-top: 10px; min-height: 26px;
+  }
+  .userbar .name { font-weight: 700; color: #6b4a2f; }
+  .userbar button { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
+  .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: #e0c39a; margin-left: 6px; }
+  .score-box { text-align: center; margin-top: 8px; }
+  .score { font-size: 56px; font-weight: 800; line-height: 1; }
   .score-label { font-size: 12px; color: #9c7c56; }
   .poop {
     font-size: 92px; line-height: 1; cursor: pointer;
     filter: drop-shadow(0 8px 6px rgba(90,58,30,.25));
-    transition: transform .08s;
-    margin: 8px 0;
+    transition: transform .08s; margin: 6px 0;
   }
   .poop:active { transform: scale(.88) rotate(-6deg); }
   .bar-wrap { width: 100%; max-width: 320px; }
   .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #8a6a48; margin-bottom: 6px; }
   .bar { height: 14px; background: #d9bb90; border-radius: 10px; overflow: hidden; }
   .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#c98a3c,#e0a94f); transition: width .15s; }
-  .btns { display: flex; gap: 12px; margin-top: 8px; }
+  .msg { min-height: 20px; font-size: 13px; color: #9c7c56; text-align: center; }
+  .btns { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
   button {
-    border: 0; border-radius: 12px; padding: 12px 22px; font-size: 15px;
+    border: 0; border-radius: 12px; padding: 11px 18px; font-size: 14px;
     background: #6b4a2f; color: #fff; cursor: pointer;
   }
   button.ghost { background: transparent; color: #6b4a2f; border: 2px solid #6b4a2f; }
+  button.sm { padding: 6px 12px; font-size: 12px; }
   button:active { transform: scale(.95); }
-  .msg { min-height: 20px; font-size: 13px; color: #9c7c56; text-align: center; }
+  button:disabled { opacity: .5; cursor: default; }
+
+  .overlay {
+    position: fixed; inset: 0; background: rgba(60,40,20,.5);
+    display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  }
+  .overlay.show { display: flex; }
+  .card {
+    background: #fff8ea; border-radius: 18px; padding: 22px; width: min(100%, 360px);
+    box-shadow: 0 12px 40px rgba(60,40,20,.3);
+  }
+  .card h2 { margin: 0 0 14px; font-size: 19px; text-align: center; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+  .tabs button { flex: 1; background: #e8d4b4; color: #6b4a2f; }
+  .tabs button.on { background: #6b4a2f; color: #fff; }
+  .field { margin-bottom: 10px; }
+  .field label { display: block; font-size: 12px; color: #8a6a48; margin-bottom: 4px; }
+  .field input {
+    width: 100%; padding: 10px 12px; font-size: 15px; border: 2px solid #d9bb90;
+    border-radius: 10px; background: #fffdf8; outline: none;
+  }
+  .field input:focus { border-color: #c98a3c; }
+  .card-msg { min-height: 18px; font-size: 12px; color: #b05252; text-align: center; margin: 6px 0; }
+  .card .primary { width: 100%; margin-top: 4px; }
+  .card .close { width: 100%; margin-top: 8px; background: transparent; color: #8a6a48; }
+  .rank-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px dashed #e0c9a6; font-size: 14px; }
+  .rank-row:last-child { border-bottom: 0; }
+  .rank-row.me { color: #c98a3c; font-weight: 700; }
+  .rank-empty { text-align: center; color: #9c7c56; font-size: 13px; padding: 20px 0; }
 </style>
 </head>
 <body>
 <div id="game">
-  <div style="text-align:center">
+  <div class="head">
     <h1>💩 拉屎大作战</h1>
     <div class="sub">点一点，攒便便，冲上排行榜</div>
+    <div class="userbar">
+      <span id="userinfo">未登录 <span class="badge" id="mode">本地</span></span>
+      <span id="useracts"><button id="login" class="sm ghost">登录 / 注册</button></span>
+    </div>
   </div>
 
   <div class="score-box">
@@ -66,14 +107,42 @@
 
   <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
   <div class="btns">
+    <button id="rank" class="ghost">🏆 排行榜</button>
     <button id="reset" class="ghost">重新开始</button>
-    <button id="login">登录 / 注册</button>
   </div>
 </div>
 
+<!-- 登录 / 注册 -->
+<div class="overlay" id="authOverlay">
+  <div class="card">
+    <h2 id="authTitle">登录</h2>
+    <div class="tabs">
+      <button id="tabLogin" class="on">登录</button>
+      <button id="tabReg">注册</button>
+    </div>
+    <div class="field"><label>用户名（2-20 字符）</label><input id="au" autocomplete="username" placeholder="用户名"></div>
+    <div class="field"><label>密码（6-32 位）</label><input id="ap" type="password" autocomplete="current-password" placeholder="密码"></div>
+    <div class="card-msg" id="authMsg"></div>
+    <button id="authSubmit" class="primary">登录</button>
+    <button id="authClose" class="close">取消</button>
+  </div>
+</div>
+
+<!-- 排行榜 -->
+<div class="overlay" id="rankOverlay">
+  <div class="card">
+    <h2>🏆 排行榜</h2>
+    <div id="rankList"><div class="rank-empty">加载中…</div></div>
+    <button id="rankClose" class="close">关闭</button>
+  </div>
+</div>
+
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js" onerror="window.__sdkFailed=true"></script>
+<script src="config.js"></script>
+<script src="cloud.js"></script>
 <script>
 (function () {
-  var score = 0, lv = 1, best = 0;
+  var score = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   var $ = function (id) { return document.getElementById(id); };
 
   function need(n) { return 10 * n * n; }
@@ -83,23 +152,110 @@
     $('bar').style.width = Math.min(100, (score - need(lv - 1)) / (need(lv) - need(lv - 1)) * 100) + '%';
     $('best').textContent = best;
   }
+  function localBest() { try { return parseInt(localStorage.getItem('ls_best') || '0', 10) || 0; } catch (e) { return 0; } }
+  function setLocalBest(v) { try { localStorage.setItem('ls_best', v); } catch (e) {} }
+
+  function refreshUser() {
+    var me = window.CloudAuth.me();
+    if (me) {
+      $('userinfo').innerHTML = '<span class="name">' + me.nickname + '</span> <span class="badge">' + (cloudOn ? '云端' : '本地') + '</span>';
+      $('useracts').innerHTML = '<button id="logout" class="sm ghost">退出</button>';
+      $('logout').onclick = function () {
+        window.CloudAuth.logout();
+        best = localBest(); refreshUser(); render();
+      };
+    } else {
+      $('userinfo').innerHTML = '未登录 <span class="badge" id="mode">' + (cloudOn ? '云端' : '本地') + '</span>';
+      $('useracts').innerHTML = '<button id="login" class="sm ghost">登录 / 注册</button>';
+      $('login').onclick = openAuth;
+    }
+    $('mode') && ($('mode').textContent = cloudOn ? '云端' : '本地');
+  }
+
+  function scheduleSave() {
+    var me = window.CloudAuth.me();
+    if (!cloudOn || !me) return;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(function () {
+      window.CloudAuth.pushBest(me.user, best);
+    }, (window.LS_CONFIG && window.LS_CONFIG.SAVE_DEBOUNCE_MS) || 1500);
+  }
 
   $('poop').addEventListener('click', function () {
     score++;
-    if (score > best) { best = score; try { localStorage.setItem('ls_best', best); } catch (e) {} }
+    if (score > best) { best = score; setLocalBest(best); scheduleSave(); }
     while (score >= need(lv)) { lv++; $('msg').textContent = '升级啦！Lv.' + lv; }
     render();
   });
+  $('reset').addEventListener('click', function () { score = 0; lv = 1; $('msg').textContent = '重新开始'; render(); });
 
-  $('reset').addEventListener('click', function () {
-    score = 0; lv = 1; $('msg').textContent = '重新开始'; render();
-  });
+  // ---- 登录/注册 UI ----
+  var authMode = 'login';
+  function setAuthMode(m) {
+    authMode = m;
+    $('tabLogin').className = m === 'login' ? 'on' : '';
+    $('tabReg').className = m === 'reg' ? 'on' : '';
+    $('authTitle').textContent = m === 'login' ? '登录' : '注册';
+    $('authSubmit').textContent = m === 'login' ? '登录' : '注册';
+    $('authMsg').textContent = '';
+  }
+  function openAuth() { $('authOverlay').classList.add('show'); setAuthMode('login'); $('au').focus(); }
+  $('tabLogin').onclick = function () { setAuthMode('login'); };
+  $('tabReg').onclick = function () { setAuthMode('reg'); };
+  $('authClose').onclick = function () { $('authOverlay').classList.remove('show'); };
+  $('authOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
 
-  $('login').addEventListener('click', function () {
-    $('msg').textContent = '登录功能待接入（见 README）';
-  });
+  $('authSubmit').onclick = function () {
+    var u = $('au').value, p = $('ap').value;
+    $('authMsg').textContent = '处理中…';
+    var fn = authMode === 'login' ? window.CloudAuth.login : window.CloudAuth.register;
+    fn(u, p).then(function (res) {
+      $('authMsg').textContent = res.msg || '';
+      if (!res.ok) return;
+      if (authMode === 'reg') { setAuthMode('login'); return; }
+      $('authOverlay').classList.remove('show');
+      refreshUser();
+      if (res.me && cloudOn) {
+        window.CloudAuth.pullBest(res.me.user).then(function (b) {
+          best = b > localBest() ? b : localBest();
+          setLocalBest(best); render();
+        });
+      }
+    });
+  };
 
-  try { best = parseInt(localStorage.getItem('ls_best') || '0', 10) || 0; } catch (e) {}
+  // ---- 排行榜 UI ----
+  $('rank').onclick = function () {
+    $('rankOverlay').classList.add('show');
+    $('rankList').innerHTML = '<div class="rank-empty">加载中…</div>';
+    if (!cloudOn) {
+      $('rankList').innerHTML = '<div class="rank-empty">未启用云端模式，暂无排行榜<br>请在 config.js 填入环境 ID</div>';
+      return;
+    }
+    window.CloudAuth.ranking(20).then(function (rows) {
+      if (!rows.length) { $('rankList').innerHTML = '<div class="rank-empty">还没有人上榜</div>'; return; }
+      var me = window.CloudAuth.me();
+      $('rankList').innerHTML = rows.map(function (r, i) {
+        var cls = (me && r.user === me.user) ? ' class="rank-row me"' : ' class="rank-row"';
+        return '<div' + cls + '><span>' + (i + 1) + '. ' + r.nickname + '</span><span>💩 ' + r.best + '</span></div>';
+      }).join('');
+    });
+  };
+  $('rankClose').onclick = function () { $('rankOverlay').classList.remove('show'); };
+  $('rankOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
+
+  // ---- 启动 ----
+  cloudOn = window.CloudAuth.init();
+  if (!cloudOn && window.__sdkFailed) console.warn('[CloudBase] SDK 加载失败，使用本地模式');
+  refreshUser();
+  var me = window.CloudAuth.me();
+  if (cloudOn && me) {
+    window.CloudAuth.pullBest(me.user).then(function (b) {
+      if (b > 0) { best = b; setLocalBest(best); render(); }
+    });
+  } else {
+    best = localBest();
+  }
   render();
 })();
 </script>
