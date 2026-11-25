@@ -1,33 +1,54 @@
 # 拉屎大作战
 
-一个 H5 点击小游戏。点击 💩 累计分数、按平方曲线升级；接入腾讯云 CloudBase 后可**跨设备登录、云端存分、排行榜**。
+H5 点击小游戏。点击 💩 累计分数、升级；接入腾讯云 CloudBase（PG 模式）后可**跨设备登录、云端存分、排行榜**。
 
 ## 快速体验（本地模式）
 
-双击 `index.html` 即可玩，或：
+双击 `index.html` 即可玩，或 `python -m http.server 8000` 后访问 `http://localhost:8000`。
+未配置 CloudBase 时数据只存浏览器 `localStorage`，换设备会丢。
 
-```bash
-python -m http.server 8000
-# 打开 http://localhost:8000
-```
+## 接入 CloudBase 账号系统
 
-未配置 CloudBase 时数据只存在浏览器 `localStorage`，换设备会丢。
+> 你的环境是 **PG 模式**（新建环境默认如此），必须用 SQL 建表 + `app.rdb()`，不能用旧版文档型集合。
 
-## 接入 CloudBase 账号系统（4 步）
+### 1. 拿环境 ID
 
-### 1. 创建环境
-
-进入 [腾讯云 CloudBase 控制台](https://console.cloud.tencent.com/tcb)，新建环境（按量计费，有免费额度）。记下**环境 ID**，形如 `la-shi-8gxxxxxx`。
+控制台 → 左侧「环境管理」或顶部环境下拉，复制完整环境 ID（形如 `la-shi-8gxxxxxx`，不是显示名 `la-shi`）。
 
 ### 2. 开启匿名登录
 
-控制台 → **登录授权**（身份认证）→ 登录方式 → 打开 **匿名登录**。
-（本游戏用匿名登录取得数据库访问权，用户账号由游戏自己管理，无需配置 SMTP 邮箱。）
+控制台 → **身份认证** → 登录方式 → 打开 **匿名登录**。
+（底部"待办事项"里那条「已配置·匿名登录」就是它。）
 
-### 3. 建数据库集合
+### 3. 建表 + 权限（SQL 编辑器）
 
-控制台 → **数据库** → 新建集合，名字填 `ls_users`。
-权限建议先设为「**所有用户可读，所有用户可写**」（小游戏够用；正式产品可配合安全规则收紧）。
+控制台 → 左侧 **PostgreSQL** → SQL 编辑器 / 数据管理，执行：
+
+```sql
+CREATE TABLE IF NOT EXISTS public.ls_users (
+  id bigserial PRIMARY KEY,
+  user text UNIQUE NOT NULL,
+  nickname text NOT NULL,
+  salt text NOT NULL,
+  pass text NOT NULL,
+  best integer NOT NULL DEFAULT 0,
+  created_at bigint NOT NULL
+);
+
+ALTER TABLE public.ls_users ENABLE ROW LEVEL SECURITY;
+GRANT SELECT, INSERT, UPDATE ON public.ls_users TO authenticated;
+GRANT SELECT ON public.ls_users TO anon;
+GRANT SELECT ON public.ls_users TO service_role;
+GRANT USAGE, SELECT ON SEQUENCE public.ls_users_id_seq TO authenticated;
+
+-- 允许登录用户读全部（排行榜）与写自己的记录
+CREATE POLICY ls_read ON public.ls_users FOR SELECT TO authenticated USING (true);
+CREATE POLICY ls_insert ON public.ls_users FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY ls_anon_read ON public.ls_users FOR SELECT TO anon USING (true);
+```
+
+> 说明：这是小游戏级别方案——所有登录用户可读排行榜、可新增/更新记录（密码已加盐哈希）。若要严格隔离用户数据，可把 `ls_update` 的 USING 加上 `user = current_setting('request.jwt.claims',true)::json->>'sub'` 之类的约束。
 
 ### 4. 填环境 ID
 
@@ -36,33 +57,30 @@ python -m http.server 8000
 ```js
 window.LS_CONFIG = {
   ENV: '你的环境 ID',   // ← 改这里
-  COLLECTION: 'ls_users',
+  TABLE: 'ls_users',
   SAVE_DEBOUNCE_MS: 1500
 };
 ```
 
-重新部署到 GitHub Pages 后即可注册/登录、云端同步最高分、查看排行榜。
+重新部署即可注册/登录、云端同步最高分、查看排行榜。
 
-## 账号机制说明
+## 账号机制
 
-- 注册时用户名转小写、去除非法字符；密码用 Web Crypto SHA-256 **加随机盐**哈希后存库，不明文保存。
-- 登录态（用户名/昵称）存浏览器 `localStorage`，刷新不用重新登录；点「退出」清除。
-- 最高分变更防抖 1.5 秒写入云端；登录时拉取云端最高分与本机比较取大值。
+- 用户名转小写、去非法字符（2-20 字符）；密码 SHA-256 + 随机盐哈希，不明文存库。
+- 登录态存 localStorage，刷新免登录；点「退出」清除。
+- 最高分变更防抖 1.5 秒写入；登录时拉取云端最高分与本机取大值。
 - 排行榜按 `best` 倒序取前 20。
-
-> 注意：这是**小游戏级别**的账号方案，不是金融级鉴权。密码哈希在前端完成，安全规则全开时他人可读取集合数据。若要严谨隔离，建议后续改用 CloudBase 邮箱登录 + 安全规则「仅创建者可读写」。
 
 ## 文件结构
 
 | 文件 | 作用 |
 |------|------|
 | `index.html` | 游戏界面 + 登录/注册/排行榜 UI |
-| `cloud.js` | CloudBase 账号层（注册/登录/读写分数/排行榜） |
+| `cloud.js` | CloudBase PG 账号层（匿名登录 + rdb 读写） |
 | `config.js` | 环境 ID 与参数配置 |
 | `README.md` | 本文档 |
 
 ## GitHub
 
 仓库：https://github.com/kegaiisyou/la-shi
-
-本机 `github.com:443` 直连不通，remote 已设为镜像地址 `https://gh-proxy.com/https://github.com/kegaiisyou/la-shi.git`。推送时若需要凭据，用 Windows 凭据管理器里 `git:https://github.com`（用户 `kegaiisyou`）即可。
+本机 `github.com:443` 直连不通，remote 已设为镜像 `https://gh-proxy.com/https://github.com/kegaiisyou/la-shi.git`。
