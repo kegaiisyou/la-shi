@@ -30,14 +30,53 @@
   .userbar button { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
   .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: #e0c39a; margin-left: 6px; }
   .score-box { text-align: center; margin-top: 8px; }
-  .score { font-size: 56px; font-weight: 800; line-height: 1; }
+  .score { font-size: 56px; font-weight: 800; line-height: 1; transition: transform .12s; }
+  .score.bump { transform: scale(1.18); }
   .score-label { font-size: 12px; color: #9c7c56; }
+
+  /* ---- 便便本体 + Q弹动画 ---- */
+  .poop-wrap { position: relative; margin: 6px 0; }
   .poop {
     font-size: 92px; line-height: 1; cursor: pointer;
     filter: drop-shadow(0 8px 6px rgba(90,58,30,.25));
-    transition: transform .08s; margin: 6px 0;
+    display: inline-block; transform-origin: 50% 80%;
   }
-  .poop:active { transform: scale(.88) rotate(-6deg); }
+  .poop.pop { animation: poopPop .42s cubic-bezier(.34,1.56,.64,1); }
+  @keyframes poopPop {
+    0%   { transform: scale(1) translateY(0) rotate(0); }
+    25%  { transform: scale(1.28) translateY(-10px) rotate(-9deg); }
+    50%  { transform: scale(.86) translateY(4px) rotate(6deg); }
+    72%  { transform: scale(1.09) translateY(-3px) rotate(-3deg); }
+    100% { transform: scale(1) translateY(0) rotate(0); }
+  }
+  .poop.idle { animation: poopIdle 2.6s ease-in-out infinite; }
+  @keyframes poopIdle {
+    0%,100% { transform: scale(1) translateY(0); }
+    50%     { transform: scale(1.04) translateY(-5px); }
+  }
+  /* 彩虹皮肤专属流光 */
+  .poop.skin-rainbow { animation: rainbowHue 3s linear infinite; }
+  @keyframes rainbowHue { from { filter: hue-rotate(0) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } to { filter: hue-rotate(360deg) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } }
+  .pop-num {
+    position: fixed; pointer-events: none; z-index: 60;
+    font-size: 26px; font-weight: 800; color: #b05252;
+    text-shadow: 0 2px 4px rgba(255,255,255,.7);
+    animation: popNum .7s ease-out forwards;
+  }
+  @keyframes popNum {
+    0%   { opacity: 1; transform: translateY(0) scale(.7); }
+    30%  { transform: translateY(-18px) scale(1.2); }
+    100% { opacity: 0; transform: translateY(-70px) scale(1); }
+  }
+  .spark {
+    position: fixed; pointer-events: none; z-index: 59; font-size: 18px;
+    animation: sparkFly .6s ease-out forwards;
+  }
+  @keyframes sparkFly {
+    0%   { opacity: 1; transform: translate(0,0) scale(.5); }
+    100% { opacity: 0; transform: translate(var(--dx),var(--dy)) scale(1.2) rotate(180deg); }
+  }
+
   .bar-wrap { width: 100%; max-width: 320px; }
   .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #8a6a48; margin-bottom: 6px; }
   .bar { height: 14px; background: #d9bb90; border-radius: 10px; overflow: hidden; }
@@ -59,7 +98,8 @@
   }
   .overlay.show { display: flex; }
   .card {
-    background: #fff8ea; border-radius: 18px; padding: 22px; width: min(100%, 360px);
+    background: #fff8ea; border-radius: 18px; padding: 22px; width: min(100%, 380px);
+    max-height: 86vh; overflow-y: auto;
     box-shadow: 0 12px 40px rgba(60,40,20,.3);
   }
   .card h2 { margin: 0 0 14px; font-size: 19px; text-align: center; }
@@ -80,6 +120,20 @@
   .rank-row:last-child { border-bottom: 0; }
   .rank-row.me { color: #c98a3c; font-weight: 700; }
   .rank-empty { text-align: center; color: #9c7c56; font-size: 13px; padding: 20px 0; }
+
+  /* ---- 皮肤面板 ---- */
+  .skin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .skin-item {
+    border: 2px solid #e0c9a6; border-radius: 14px; padding: 12px 6px;
+    text-align: center; cursor: pointer; background: #fffdf8; transition: transform .1s, border-color .15s;
+  }
+  .skin-item:active { transform: scale(.95); }
+  .skin-item.on { border-color: #c98a3c; background: #fbeed6; }
+  .skin-item.locked { opacity: .55; cursor: default; }
+  .skin-emoji { font-size: 42px; line-height: 1.1; display: block; margin-bottom: 4px; }
+  .skin-name { font-size: 13px; font-weight: 700; }
+  .skin-cond { font-size: 11px; color: #9c7c56; margin-top: 2px; }
+  .skin-on-tag { font-size: 10px; color: #c98a3c; font-weight: 700; }
 </style>
 </head>
 <body>
@@ -98,7 +152,9 @@
     <div class="score-label">累计便便</div>
   </div>
 
-  <div class="poop" id="poop" role="button" aria-label="点击拉屎">💩</div>
+  <div class="poop-wrap">
+    <span class="poop idle" id="poop" role="button" aria-label="点击拉屎">💩</span>
+  </div>
 
   <div class="bar-wrap">
     <div class="bar-label"><span>升级进度</span><span id="lv">Lv.1</span></div>
@@ -107,8 +163,18 @@
 
   <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
   <div class="btns">
+    <button id="skin" class="ghost">🎨 皮肤</button>
     <button id="rank" class="ghost">🏆 排行榜</button>
     <button id="reset" class="ghost">重新开始</button>
+  </div>
+</div>
+
+<!-- 皮肤 -->
+<div class="overlay" id="skinOverlay">
+  <div class="card">
+    <h2>🎨 选择你的屎</h2>
+    <div class="skin-grid" id="skinGrid"></div>
+    <button id="skinClose" class="close">关闭</button>
   </div>
 </div>
 
@@ -145,6 +211,28 @@
   var score = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   var $ = function (id) { return document.getElementById(id); };
 
+  // ---- 皮肤定义（按最高分解锁）----
+  var SKINS = [
+    { id:'classic',  name:'经典屎', emoji:'💩', filter:'none', need:0,   spark:'💩' },
+    { id:'gold',     name:'黄金屎', emoji:'💩', filter:'sepia(1) saturate(5) hue-rotate(2deg) brightness(1.12)', need:10,  spark:'✨' },
+    { id:'jade',     name:'翡翠屎', emoji:'💩', filter:'hue-rotate(85deg) saturate(2.2)', need:30,  spark:'🍀' },
+    { id:'ice',      name:'冰爽屎', emoji:'💩', filter:'hue-rotate(175deg) saturate(2) brightness(1.05)', need:60, spark:'❄️' },
+    { id:'grape',    name:'紫晶屎', emoji:'💩', filter:'hue-rotate(260deg) saturate(2.4)', need:100, spark:'🔮' },
+    { id:'lava',     name:'岩浆屎', emoji:'💩', filter:'hue-rotate(-28deg) saturate(4) brightness(1.08)', need:150, spark:'🔥' },
+    { id:'rainbow',  name:'彩虹屎', emoji:'💩', filter:'none', cls:'skin-rainbow', need:200, spark:'🌈' }
+  ];
+  var curSkin = 'classic';
+  try { curSkin = localStorage.getItem('ls_skin') || 'classic'; } catch (e) {}
+  function skinById(id) { for (var i=0;i<SKINS.length;i++) if (SKINS[i].id===id) return SKINS[i]; return SKINS[0]; }
+  function applySkin() {
+    var s = skinById(curSkin);
+    var el = $('poop');
+    el.textContent = s.emoji;
+    el.style.filter = (s.filter && s.filter!=='none') ? s.filter : '';
+    el.className = 'poop idle' + (s.cls ? ' ' + s.cls : '');
+  }
+  function unlocked(s) { return best >= s.need; }
+
   function need(n) { return 10 * n * n; }
   function render() {
     $('score').textContent = score;
@@ -162,7 +250,7 @@
       $('useracts').innerHTML = '<button id="logout" class="sm ghost">退出</button>';
       $('logout').onclick = function () {
         window.CloudAuth.logout();
-        best = localBest(); refreshUser(); render();
+        best = localBest(); refreshUser(); render(); renderSkins();
       };
     } else {
       $('userinfo').innerHTML = '未登录 <span class="badge" id="mode">' + (cloudOn ? '云端' : '本地') + '</span>';
@@ -181,13 +269,77 @@
     }, (window.LS_CONFIG && window.LS_CONFIG.SAVE_DEBOUNCE_MS) || 1500);
   }
 
-  $('poop').addEventListener('click', function () {
+  // ---- 点击：Q弹 + 飘字 + 火花 + 分数弹跳 ----
+  function floatPop(e) {
+    var wrap = $('poop').getBoundingClientRect();
+    var num = document.createElement('div');
+    num.className = 'pop-num';
+    num.textContent = '+1';
+    num.style.left = (wrap.left + wrap.width/2 + (Math.random()-0.5)*46) + 'px';
+    num.style.top = (wrap.top + 16) + 'px';
+    document.body.appendChild(num);
+    setTimeout(function () { if (num.parentNode) num.parentNode.removeChild(num); }, 720);
+
+    var s = skinById(curSkin);
+    for (var i=0;i<3;i++) {
+      var sp = document.createElement('div');
+      sp.className = 'spark';
+      sp.textContent = s.spark;
+      sp.style.left = (wrap.left + wrap.width/2 - 10) + 'px';
+      sp.style.top = (wrap.top + wrap.height/2 - 10) + 'px';
+      sp.style.setProperty('--dx', ((Math.random()-0.5)*120) + 'px');
+      sp.style.setProperty('--dy', (-40 - Math.random()*70) + 'px');
+      document.body.appendChild(sp);
+      (function (node) { setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 620); })(sp);
+    }
+  }
+
+  $('poop').addEventListener('click', function (e) {
     score++;
-    if (score > best) { best = score; setLocalBest(best); scheduleSave(); }
+    var el = $('poop');
+    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    $('score').classList.add('bump');
+    setTimeout(function () { $('score').classList.remove('bump'); }, 120);
+    floatPop(e);
+    if (score > best) {
+      best = score; setLocalBest(best); scheduleSave();
+      // 解锁新皮肤时提示
+      for (var i=0;i<SKINS.length;i++) {
+        if (SKINS[i].need === best) { $('msg').textContent = '🎉 解锁新皮肤：' + SKINS[i].name; renderSkins(); break; }
+      }
+    }
     while (score >= need(lv)) { lv++; $('msg').textContent = '升级啦！Lv.' + lv; }
     render();
   });
   $('reset').addEventListener('click', function () { score = 0; lv = 1; $('msg').textContent = '重新开始'; render(); });
+
+  // ---- 皮肤面板 ----
+  function renderSkins() {
+    $('skinGrid').innerHTML = SKINS.map(function (s) {
+      var ok = unlocked(s);
+      var on = s.id === curSkin;
+      var cls = 'skin-item' + (on ? ' on' : '') + (ok ? '' : ' locked');
+      var filterCss = (s.filter && s.filter!=='none') ? ('filter:' + s.filter + ';') : '';
+      var cond = ok ? (on ? '<div class="skin-on-tag">使用中</div>' : '') : ('🔒 最高分 ' + s.need);
+      return '<div class="' + cls + '" data-skin="' + s.id + '">' +
+        '<span class="skin-emoji" style="' + filterCss + '">' + s.emoji + '</span>' +
+        '<div class="skin-name">' + s.name + '</div>' +
+        '<div class="skin-cond">' + cond + '</div></div>';
+    }).join('');
+    Array.prototype.forEach.call($('skinGrid').querySelectorAll('[data-skin]'), function (item) {
+      item.onclick = function () {
+        var s = skinById(item.getAttribute('data-skin'));
+        if (!unlocked(s)) { $('msg').textContent = '最高分达到 ' + s.need + ' 才能解锁「' + s.name + '」'; return; }
+        curSkin = s.id;
+        try { localStorage.setItem('ls_skin', curSkin); } catch (e) {}
+        applySkin(); renderSkins();
+        $('msg').textContent = '已换上「' + s.name + '」';
+      };
+    });
+  }
+  $('skin').onclick = function () { renderSkins(); $('skinOverlay').classList.add('show'); };
+  $('skinClose').onclick = function () { $('skinOverlay').classList.remove('show'); };
+  $('skinOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
 
   // ---- 登录/注册 UI ----
   var authMode = 'login';
@@ -217,8 +369,8 @@
       refreshUser();
       if (res.me && cloudOn) {
         window.CloudAuth.pullBest(res.me.user).then(function (b) {
-          best = b > localBest() ? b : localBest();
-          setLocalBest(best); render();
+          var newBest = b > localBest() ? b : localBest();
+          if (newBest !== best) { best = newBest; setLocalBest(best); render(); renderSkins(); }
         });
       }
     });
@@ -246,17 +398,17 @@
 
   // ---- 启动 ----
   cloudOn = window.CloudAuth.init();
-  if (!cloudOn && window.__sdkFailed) console.warn('[CloudBase] SDK 加载失败，使用本地模式');
+  applySkin();
   refreshUser();
   var me = window.CloudAuth.me();
   if (cloudOn && me) {
     window.CloudAuth.pullBest(me.user).then(function (b) {
-      if (b > 0) { best = b; setLocalBest(best); render(); }
+      if (b > 0) { best = b; setLocalBest(best); render(); renderSkins(); }
     });
   } else {
     best = localBest();
   }
-  render();
+  render(); renderSkins();
 })();
 </script>
 </body>
