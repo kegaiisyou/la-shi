@@ -1,6 +1,7 @@
 /* CloudBase PG 模式账号层
  * 使用 app.rdb()（Supabase 风格）+ 匿名登录 + 自建账号表 ls_users
  * 暴露 window.CloudAuth
+ * 注意：username 才是字段名（user 是 PG 保留字）；本地登录态仍用 me.user
  */
 (function () {
   var CFG = window.LS_CONFIG || {};
@@ -22,7 +23,6 @@
     }
   }
 
-  // PG 模式：显式匿名登录，拿到 JWT 后才能读写数据库
   function ensureAuth() {
     if (!cloud) return Promise.resolve(false);
     var auth = typeof app.auth === 'function' ? app.auth() : app.auth;
@@ -33,8 +33,7 @@
   function errMsg(e) { return (e && (e.message || e.msg)) || String(e); }
 
   function hash(pass, salt) {
-    var input = salt + '|' + pass;
-    var bytes = new TextEncoder().encode(input);
+    var bytes = new TextEncoder().encode(salt + '|' + pass);
     return crypto.subtle.digest('SHA-256', bytes).then(function (buf) {
       var hex = '';
       new Uint8Array(buf).forEach(function (b) { hex += ('0' + b.toString(16)).slice(-2); });
@@ -54,7 +53,6 @@
   }
 
   function send(q) {
-    // Supabase 风格 thenable：resolve 为 { data, error }
     return Promise.resolve(q).then(function (res) {
       if (res && res.error) throw new Error(res.error.message || String(res.error));
       return res || {};
@@ -69,13 +67,13 @@
     if (!cloud) return Promise.resolve({ ok: false, msg: '未启用云端模式' });
 
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id').eq('user', u));
+      return send(db.from(CFG.TABLE).select('id').eq('username', u));
     }).then(function (res) {
       if (res.data && res.data.length) return { ok: false, msg: '用户名已被占用' };
       var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
       return hash(password, salt).then(function (h) {
         return send(db.from(CFG.TABLE).insert({
-          user: u, nickname: u, salt: salt, pass: h,
+          username: u, nickname: u, salt: salt, pass: h,
           best: 0, created_at: Date.now()
         })).then(function () { return { ok: true, msg: '注册成功，请登录' }; });
       });
@@ -86,7 +84,7 @@
     var u = sanitize(username);
     if (!cloud) return Promise.resolve({ ok: false, msg: '未启用云端模式' });
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id,user,nickname,salt,pass,best').eq('user', u));
+      return send(db.from(CFG.TABLE).select('id,username,nickname,salt,pass,best').eq('username', u));
     }).then(function (res) {
       var rec = res.data && res.data[0];
       if (!rec) return { ok: false, msg: '用户不存在' };
@@ -109,7 +107,7 @@
   function pullBest(username) {
     if (!cloud) return Promise.resolve(0);
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('best').eq('user', username));
+      return send(db.from(CFG.TABLE).select('best').eq('username', username));
     }).then(function (res) {
       return (res.data && res.data[0] && res.data[0].best) || 0;
     }).catch(function () { return 0; });
@@ -118,7 +116,7 @@
   function pushBest(username, best) {
     if (!cloud || !username) return Promise.resolve(false);
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id,best').eq('user', username));
+      return send(db.from(CFG.TABLE).select('id,best').eq('username', username));
     }).then(function (res) {
       var rec = res.data && res.data[0];
       if (!rec) return false;
@@ -131,11 +129,10 @@
     limit = limit || 10;
     if (!cloud) return Promise.resolve([]);
     return ensureAuth().then(function () {
-      // Supabase 风格降序 + 限量
-      return send(db.from(CFG.TABLE).select('user,nickname,best').order('best', { ascending: false }).limit(limit));
+      return send(db.from(CFG.TABLE).select('username,nickname,best').order('best', { ascending: false }).limit(limit));
     }).then(function (res) {
       return (res.data || []).map(function (r) {
-        return { nickname: r.nickname || r.user, best: r.best || 0, user: r.user };
+        return { nickname: r.nickname || r.username, best: r.best || 0, user: r.username };
       });
     }).catch(function () { return []; });
   }

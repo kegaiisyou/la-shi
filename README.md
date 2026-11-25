@@ -7,27 +7,24 @@ H5 点击小游戏。点击 💩 累计分数、升级；接入腾讯云 CloudBa
 双击 `index.html` 即可玩，或 `python -m http.server 8000` 后访问 `http://localhost:8000`。
 未配置 CloudBase 时数据只存浏览器 `localStorage`，换设备会丢。
 
-## 接入 CloudBase 账号系统
+## 线上地址
 
-> 你的环境是 **PG 模式**（新建环境默认如此），必须用 SQL 建表 + `app.rdb()`，不能用旧版文档型集合。
+https://kegaiisyou.github.io/la-shi/
 
-### 1. 拿环境 ID
+## CloudBase 配置（已完成）
 
-控制台 → 左侧「环境管理」或顶部环境下拉，复制完整环境 ID（形如 `la-shi-8gxxxxxx`，不是显示名 `la-shi`）。
+- 环境 ID：`la-shi-d9g35yrnaef3ef5b9`（已填入 `config.js`）
+- 匿名登录：已开启
+- PG 模式：新版控制台无「Web 安全域名」选项，无需配置
 
-### 2. 开启匿名登录
+### 建表 SQL（注意 `username` 不是 `user`，`user` 是 PG 保留字）
 
-控制台 → **身份认证** → 登录方式 → 打开 **匿名登录**。
-（底部"待办事项"里那条「已配置·匿名登录」就是它。）
-
-### 3. 建表 + 权限（SQL 编辑器）
-
-控制台 → 左侧 **PostgreSQL** → SQL 编辑器 / 数据管理，执行：
+控制台 → 左侧 **PostgreSQL** → SQL 编辑器，粘贴执行，弹窗点 **「仍要执行」**：
 
 ```sql
 CREATE TABLE IF NOT EXISTS public.ls_users (
   id bigserial PRIMARY KEY,
-  user text UNIQUE NOT NULL,
+  username text UNIQUE NOT NULL,
   nickname text NOT NULL,
   salt text NOT NULL,
   pass text NOT NULL,
@@ -38,31 +35,15 @@ CREATE TABLE IF NOT EXISTS public.ls_users (
 ALTER TABLE public.ls_users ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE ON public.ls_users TO authenticated;
 GRANT SELECT ON public.ls_users TO anon;
-GRANT SELECT ON public.ls_users TO service_role;
 GRANT USAGE, SELECT ON SEQUENCE public.ls_users_id_seq TO authenticated;
 
--- 允许登录用户读全部（排行榜）与写自己的记录
 CREATE POLICY ls_read ON public.ls_users FOR SELECT TO authenticated USING (true);
 CREATE POLICY ls_insert ON public.ls_users FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY ls_anon_read ON public.ls_users FOR SELECT TO anon USING (true);
 ```
 
-> 说明：这是小游戏级别方案——所有登录用户可读排行榜、可新增/更新记录（密码已加盐哈希）。若要严格隔离用户数据，可把 `ls_update` 的 USING 加上 `user = current_setting('request.jwt.claims',true)::json->>'sub'` 之类的约束。
-
-### 4. 填环境 ID
-
-编辑 `config.js`：
-
-```js
-window.LS_CONFIG = {
-  ENV: '你的环境 ID',   // ← 改这里
-  TABLE: 'ls_users',
-  SAVE_DEBOUNCE_MS: 1500
-};
-```
-
-重新部署即可注册/登录、云端同步最高分、查看排行榜。
+> 如果之前执行过带 `user` 列的旧 SQL 并部分成功，先执行 `DROP TABLE IF EXISTS public.ls_users CASCADE;` 再执行上面整段。
 
 ## 账号机制
 
