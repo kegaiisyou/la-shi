@@ -32,16 +32,18 @@ H5 点击小游戏。点击 💩 累计分数、升级；带账号系统，可�
 
 ## 部署说明
 
-### 游戏本体改了之后
+### 游戏本体改了之后（一键部署）
 
-1. 改 `game.html` / `cloud.js` / `config.js`
-2. 上传到 CloudBase 静态托管（注意 CloudBase 用的是 `index.html` 作为入口，所以本地 `game.html` 上传时要传成 `/index.html`）：
-   ```
-   tcb hosting deploy <本地game.html> /index.html -e la-shi-d9g35yrnaef3ef5b9
-   tcb hosting deploy cloud.js /cloud.js -e la-shi-d9g35yrnaef3ef5b9
-   tcb hosting deploy config.js /config.js -e la-shi-d9g35yrnaef3ef5b9
-   ```
-3. 短地址（GitHub Pages）无需改动，它只是 iframe 包装
+改完 `game.html` / `cloud.js` / `config.js` 后，在项目目录运行：
+
+```
+powershell -ExecutionPolicy Bypass -File deploy.ps1
+```
+
+脚本会自动把三个文件上传到 CloudBase 静态托管（本地 `game.html` 传成云端 `/index.html`）。
+前提：本机 `tcb` CLI 已登录（`tcb env list` 能看到 `la-shi-d9g35yrnaef3ef5b9`），凭据由 CLI 持久化保存，无需密钥。
+
+短地址（GitHub Pages）无需改动，它只是 iframe 包装。只有改短地址页面本身才需要 git 提交推送。
 
 ### 数据库权限（已配置）
 
