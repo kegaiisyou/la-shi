@@ -111,6 +111,63 @@
       'style="' + varsStyle(s) + '">' + tiers() + '</svg>';
   }
 
+  /* ---- 落地屎：和玩家捏的完全同一坨（四段软体 + 脸 + 皮肤），飞出后堆在地上 ---- */
+  function landedMarkup(skin) {
+    return '<svg class="poop-svg skin-' + skin.id + (skin.rainbow ? ' rainbow' : '') + '" viewBox="0 0 210 210" xmlns="http://www.w3.org/2000/svg">' +
+      capeMarkup() + tiers() + '</svg>';
+  }
+  function spawnLandedPoop(skin, combo, dir) {
+    var pile = $('poopPile');
+    if (!pile) return;
+    var i = landed.length, row = Math.floor(i / 5), col = i % 5;
+    var pw = pile.clientWidth || 340, ph = pile.clientHeight || 300;
+    var sz = 46 - row * 2;
+    var pr = poop.getBoundingClientRect(), plr = pile.getBoundingClientRect();
+    var x0 = pr.left + pr.width / 2 - plr.left;
+    var y0 = pr.top + pr.height * 0.5 - plr.top;
+    var x1 = pw * (0.15 + col * 0.18 + (row % 2 ? 0.045 : 0) + (Math.random() - .5) * 0.025);
+    var y1 = ph - 24 - row * 19 + (Math.random() - .5) * 4;
+    var rot = (Math.random() - .5) * 14 + (dir || 0) * 8;
+    /* 真抛物线：给一个向上的初速度，重力把它拉回目标点 */
+    var g = 2100, rise = 68 + Math.random() * 34;
+    var vy0 = -Math.sqrt(2 * g * rise);
+    var disc = vy0 * vy0 - 2 * g * (y0 - y1);
+    var T = (-vy0 + Math.sqrt(disc)) / g;
+    if (!(T > .2 && T < 1.4)) T = .7;
+    var vx = (x1 - x0) / T;
+    var el = document.createElement('div');
+    el.className = 'landed-poop' + (combo >= 8 ? ' hot' : '');
+    el.style.cssText = varsStyle(skin) +
+      ';width:' + sz + 'px;height:' + sz + 'px;z-index:' + (10 + i) +
+      ';--rot:' + rot.toFixed(1) + 'deg;--flydur:' + T.toFixed(3) + 's;';
+    el.innerHTML = '<div class="poop-inner">' + landedMarkup(skin) + '</div>';
+    el.style.transform = 'translate(' + (x0 - sz / 2).toFixed(1) + 'px,' + (y0 - sz / 2).toFixed(1) + 'px)';
+    pile.appendChild(el);
+    landed.push(el);
+    flyers.push({ el: el, x0: x0, y0: y0, vx: vx, vy0: vy0, g: g, t: 0, T: T, sz: sz });
+    if (landed.length > MAX_LANDED) {
+      var old = landed.shift();
+      old.classList.add('gone');
+      setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 340);
+    }
+    return el;
+  }
+  function clearLanded() {
+    var pile = $('poopPile');
+    if (pile) pile.innerHTML = '';
+    landed.length = 0; flyers.length = 0;
+  }
+
+  /* 一坨飞走后，原地回到初始种子状态，等待玩家重新捏下一坨 */
+  function resetToSeed() {
+    pile = 0; pq = 0; drop = 0; lastPile = -1; lastGrow = -1;
+    for (var i = 0; i < T.length; i++) {
+      var t = T[i]; t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0;
+    }
+    waveQ.length = 0;
+    ch.sx = 1; ch.sy = 1; ch.vx = 0; ch.vy = 0; ch.rot = 0; ch.vr = 0;
+  }
+
   function applySkin(flash) {
     var s = skinById(curSkin);
     var svg = $('poop').querySelector('.poop-svg');
@@ -128,14 +185,15 @@
      ============================================================ */
   var score = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   function need(n) { return 10 * n * n; }
+  var landed = [], flyers = [], MAX_LANDED = 20;
 
   /* ============================================================
      3. 画布与粒子
      ============================================================ */
   var stage = $('stage'), poop = $('poop'), shadowEl = $('charShadow'), gameEl = $('game');
   var lastFade = -1;
-  var RV = [0.0, 0.10, 0.30, 0.58];   /* t4 先出土，往上依次冒出 */
-  var RSPAN = [0.16, 0.26, 0.28, 0.30];
+  var RV = [0.0, 0.07, 0.20, 0.38];   /* t4 先出土，往上依次冒出；前段长全、留时间展示完整形态 */
+  var RSPAN = [0.12, 0.20, 0.22, 0.24];
   var fx = $('fx'), bgfx = $('bgfx');
   var fx2d = fx.getContext('2d'), bg2d = bgfx.getContext('2d');
   var CW = 0, CH = 0, DPR = 1;
@@ -305,7 +363,7 @@
       pressActive = true;
     }
     /* 显示量：已落定的堆 + 正在挤出的那一节 */
-    var grow = Math.min(1.2, pile + pq * 0.34);
+    var grow = Math.min(1.2, pile + pq * 0.95);
     var kGrow = Math.pow(grow, 0.5);
     if (gaugeFill) {
       gaugeFill.style.transform = 'scaleY(' + pq.toFixed(3) + ')';
@@ -389,6 +447,16 @@
       (0.92 - (ch.sy * baseY - 1) * 0.3).toFixed(3) + ')';
     shadowEl.style.opacity = Math.min(1, grow * 3.2) * Math.max(.35, 1 - Math.abs(ch.sx - 1) * .8);
     shadowEl.style.width = (62 + Math.min(grow, 1.2) * 62).toFixed(0) + 'px';
+
+    /* 飞行屎：JS 驱动真抛物线位移（内层 CSS 负责挤压弹射与落地回弹） */
+    for (var f = flyers.length - 1; f >= 0; f--) {
+      var fl = flyers[f];
+      fl.t += dt;
+      if (fl.t >= fl.T) { fl.t = fl.T; flyers.splice(f, 1); }
+      var fx = fl.x0 + fl.vx * fl.t;
+      var fy = fl.y0 + fl.vy0 * fl.t + 0.5 * fl.g * fl.t * fl.t;
+      fl.el.style.transform = 'translate(' + (fx - fl.sz / 2).toFixed(1) + 'px,' + (fy - fl.sz / 2).toFixed(1) + 'px)';
+    }
 
     /* 震屏 */
     if (shake > 0.4) {
@@ -576,17 +644,22 @@
 
 
     var hintEl = $('hint'); if (hintEl) hintEl.classList.add('gone');
-    squeeze(1, dir);
     pulse(combo >= 10 ? 9 : 0);
 
-    drops(c.x, c.y + 34, skin, 1);
-    if (!RM) sparks(c.x, c.y - 20, skin, combo >= 5 ? 2 : 1);
-    ring(c.x, c.y + 30, 10, 'rgba(255,247,228,.62)', 2.5, 120, 2.6);
+    /* 飞出瞬间的粒子爆发 */
+    drops(c.x, c.y + 30, skin, 2, 1.25);
+    if (!RM) sparks(c.x, c.y - 16, skin, combo >= 5 ? 3 : 2, 1.25);
+    ring(c.x, c.y + 26, 12, 'rgba(255,247,228,.72)', 3, 170, 2.4);
+    if (!RM) confetti(c.x, c.y + 6, combo >= 5 ? 8 : 5);
+    var flyEl = spawnLandedPoop(skin, combo, dir);
+    /* 原坨立刻消失，只留飞出去的这一坨 */
+    resetToSeed();
 
-    /* 嘴巴张开 + 眼睛放大 */
-    poop.classList.add('charge');
-    clearTimeout(burst._ct);
-    burst._ct = setTimeout(function () { poop.classList.remove('charge'); }, 320);
+    /* 惊奇表情跟着飞出去的屎：张嘴 → 320ms 后恢复笑脸 */
+    if (flyEl) {
+      flyEl.classList.add('charge');
+      setTimeout(function () { flyEl.classList.remove('charge'); }, 320);
+    }
 
     popNum('+1', skin, combo);
     sfxTap(combo);
@@ -661,6 +734,7 @@
     score = 0; lv = 1; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
+    clearLanded();
     render();
     toast('已重新开始');
   });
@@ -824,6 +898,13 @@
   /* ============================================================
      13. 启动
      ============================================================ */
+  /* 手机长按不选中文字 / 不弹 iOS 菜单（输入框除外） */
+  document.addEventListener('selectstart', function (e) {
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.preventDefault) e.preventDefault();
+  });
+
   $('poop').innerHTML = charMarkup();
   buildRig();
   applySkin(false);
