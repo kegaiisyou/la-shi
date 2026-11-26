@@ -20,6 +20,8 @@ H5 长按憋屎小游戏。按住 💩 蓄力、憋满一格掉一坨计分；�
 - 密码：SHA-256 + 随机盐哈希，不明文存库
 - 登录态：localStorage，刷新免登录
 - 排行榜：按 `best` 倒序 Top 20
+- 防批量注册：注册时把当前匿名登录 uid（JWT `sub`）写入 `anon_uid` 列，唯一索引保证**一个设备身份只能注册一个账号**
+- 分数保护：数据库触发器限制单次提交增量 ≤50、`anon_uid` 绑定后不可改
 
 ## 文件结构
 
@@ -56,9 +58,33 @@ GRANT USAGE, SELECT ON SEQUENCE public.ls_users_id_seq TO anon;
 CREATE POLICY ls_anon_read ON public.ls_users FOR SELECT TO anon USING (true);
 CREATE POLICY ls_anon_insert ON public.ls_users FOR INSERT TO anon WITH CHECK (true);
 CREATE POLICY ls_anon_update ON public.ls_users FOR UPDATE TO anon USING (true) WITH CHECK (true);
+
+-- 防批量注册：一个匿名身份只能注册一个账号
+ALTER TABLE public.ls_users ADD COLUMN IF NOT EXISTS anon_uid text;
+CREATE UNIQUE INDEX IF NOT EXISTS ls_users_anon_uid_uniq ON public.ls_users(anon_uid) WHERE anon_uid IS NOT NULL;
+
+-- 分数保护：单次增量 ≤50、anon_uid 不可改
+CREATE OR REPLACE FUNCTION public.ls_users_guard() RETURNS trigger AS $$
+BEGIN
+  IF TG_OP = 'UPDATE' AND OLD.anon_uid IS DISTINCT FROM NEW.anon_uid THEN
+    RAISE EXCEPTION 'anon_uid immutable';
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.best > OLD.best AND NEW.best - OLD.best > 50 THEN
+    RAISE EXCEPTION 'score jump too large';
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.best < 0 THEN
+    RAISE EXCEPTION 'negative score';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+DROP TRIGGER IF EXISTS trg_ls_users_guard ON public.ls_users;
+CREATE TRIGGER trg_ls_users_guard BEFORE UPDATE ON public.ls_users FOR EACH ROW EXECUTE FUNCTION public.ls_users_guard();
 ```
 
 > 关键坑：匿名登录的 JWT 角色是 `anon` 不是 `authenticated`，必须给 `anon` 授予读写权限，否则注册报 `permission denied for table ls_users`。
+
+> 残留风险：实测 CloudBase PG 网关不把 JWT `sub` 注入 RLS 会话变量（`current_setting('request.jwt.claim.sub')` 为 NULL），云函数客户端调用默认被 `EXCEED_AUTHORITY` 拦截。因此目前 **anon 仍可直接 UPDATE 任意行**（受增量 ≤50 触发器限制）。要彻底堵住刷榜，需在控制台配置云函数访问权限，改为服务端可信写入并收回 anon 的 UPDATE 权限。
 
 ## GitHub
 

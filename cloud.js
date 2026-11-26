@@ -30,6 +30,24 @@
     return auth.signInAnonymously().then(function () { return true; });
   }
 
+  /* 当前匿名登录的 uid（JWT sub），用于把账号绑定到一个匿名身份，防止脚本批量注册 */
+  function anonUid() {
+    if (!cloud) return Promise.resolve('');
+    try {
+      var auth = typeof app.auth === 'function' ? app.auth() : app.auth;
+      function pick(st) { return (st && st.user && (st.user.sub || st.user.uid)) ? String(st.user.sub || st.user.uid) : ''; }
+      if (auth.getLoginState) {
+        return Promise.resolve(auth.getLoginState()).then(function (st) {
+          return pick(st);
+        }).catch(function () { return ''; });
+      }
+      if (auth.getCurrentUser) {
+        return Promise.resolve(auth.getCurrentUser()).then(pick).catch(function () { return ''; });
+      }
+    } catch (e) {}
+    return Promise.resolve('');
+  }
+
   function errMsg(e) { return (e && (e.message || e.msg)) || String(e); }
 
   function hash(pass, salt) {
@@ -67,15 +85,22 @@
     if (!cloud) return Promise.resolve({ ok: false, msg: '未启用云端模式' });
 
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id').eq('username', u));
-    }).then(function (res) {
-      if (res.data && res.data.length) return { ok: false, msg: '用户名已被占用' };
-      var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
-      return hash(password, salt).then(function (h) {
-        return send(db.from(CFG.TABLE).insert({
-          username: u, nickname: u, salt: salt, pass: h,
-          best: 0, created_at: Date.now()
-        })).then(function () { return { ok: true, msg: '注册成功，请登录' }; });
+      return anonUid();
+    }).then(function (uid) {
+      if (!uid) return { ok: false, msg: '无法获取设备身份，请稍后重试' };
+      /* 一个匿名身份只允许注册一个账号（数据库唯一索引兜底） */
+      return send(db.from(CFG.TABLE).select('id').eq('anon_uid', uid)).then(function (bound) {
+        if (bound.data && bound.data.length) return { ok: false, msg: '当前设备已注册过账号，请勿重复注册' };
+        return send(db.from(CFG.TABLE).select('id').eq('username', u)).then(function (res) {
+          if (res.data && res.data.length) return { ok: false, msg: '用户名已被占用' };
+          var salt = Math.random().toString(36).slice(2) + Date.now().toString(36);
+          return hash(password, salt).then(function (h) {
+            return send(db.from(CFG.TABLE).insert({
+              username: u, nickname: u, salt: salt, pass: h,
+              best: 0, created_at: Date.now(), anon_uid: uid
+            })).then(function () { return { ok: true, msg: '注册成功，请登录' }; });
+          });
+        });
       });
     }).catch(function (e) { return { ok: false, msg: errMsg(e) }; });
   }
