@@ -8,6 +8,7 @@ $envId = 'la-shi-d9g35yrnaef3ef5b9'
 Write-Output "=== Deploy to CloudBase [$envId] ==="
 $tasks = @(
   @{ Local = "$base/game.html";  Cloud = '/index.html' },
+  @{ Local = "$base/game.js";    Cloud = '/game.js' },
   @{ Local = "$base/cloud.js";   Cloud = '/cloud.js' },
   @{ Local = "$base/config.js";  Cloud = '/config.js' }
 )

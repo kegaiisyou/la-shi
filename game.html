@@ -1,201 +1,467 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#F3E0C2">
 <title>拉屎大作战</title>
 <style>
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-  html, body { margin: 0; height: 100%; overflow: hidden; }
+  html, body { margin: 0; height: 100%; overflow: hidden; overscroll-behavior: none; }
   body {
-    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: linear-gradient(160deg, #f6e7c8 0%, #e8c99a 100%);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    background: #E4C79B;
     display: flex; align-items: center; justify-content: center;
-    user-select: none; color: #5a3a1e;
+    color: #4B2E16; user-select: none; -webkit-font-smoothing: antialiased;
   }
-  #game {
-    width: min(100vw, 480px); height: min(100vh, 800px);
-    position: relative; display: flex; flex-direction: column;
-    align-items: center; justify-content: space-between;
-    padding: 20px 16px 28px;
+  :root {
+    --ink: #4B2E16;
+    --ink2: #8C6844;
+    --ac1: #E9A33C;
+    --ac2: #C06A22;
+    --line: #E3CBA6;
   }
-  .head { width: 100%; text-align: center; }
-  h1 { margin: 0; font-size: 26px; letter-spacing: 2px; }
-  .sub { font-size: 13px; color: #9c7c56; margin-top: 4px; }
-  .userbar {
-    width: 100%; display: flex; align-items: center; justify-content: space-between;
-    font-size: 12px; color: #8a6a48; margin-top: 10px; min-height: 26px;
-  }
-  .userbar .name { font-weight: 700; color: #6b4a2f; }
-  .userbar button { padding: 5px 10px; font-size: 12px; border-radius: 8px; }
-  .badge { font-size: 10px; padding: 2px 6px; border-radius: 6px; background: #e0c39a; margin-left: 6px; }
-  .score-box { text-align: center; margin-top: 8px; }
-  .score { font-size: 56px; font-weight: 800; line-height: 1; transition: transform .12s; }
-  .score.bump { transform: scale(1.18); }
-  .score-label { font-size: 12px; color: #9c7c56; }
 
-  /* ---- 便便本体 + 挤出动画 ---- */
-  .poop-wrap { position: relative; margin: 6px 0; display: inline-block; }
+  #game {
+    position: relative;
+    width: min(100vw, 480px); height: min(100vh, 820px);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    background: linear-gradient(178deg, #FCF4E4 0%, #F4E2C4 40%, #E9CBA1 78%, #E0BE8E 100%);
+    box-shadow: 0 26px 70px rgba(90, 55, 20, .26);
+  }
+
+  /* ---------- 场景：墙砖 + 地面 + 暗角 ---------- */
+  .wall {
+    position: absolute; inset: 0; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(150, 110, 70, .085) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(150, 110, 70, .085) 1px, transparent 1px);
+    background-size: 76px 76px;
+    background-position: 50% 0;
+    -webkit-mask-image: radial-gradient(90% 70% at 50% 22%, #000 0%, rgba(0,0,0,.55) 55%, transparent 100%);
+            mask-image: radial-gradient(90% 70% at 50% 22%, #000 0%, rgba(0,0,0,.55) 55%, transparent 100%);
+  }
+  .floor {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 34%; pointer-events: none;
+    background: linear-gradient(180deg, rgba(206,164,116,0) 0%, rgba(198,152,104,.5) 55%, rgba(178,130,84,.42) 100%);
+  }
+  .vig {
+    position: absolute; inset: 0; pointer-events: none;
+    box-shadow: inset 0 0 110px 30px rgba(120, 76, 34, .17);
+  }
+  .bgfx { position: absolute; inset: 0; pointer-events: none; opacity: .8; }
+
+  /* ---------- HUD ---------- */
+  .hud { position: relative; z-index: 5; padding: 16px 18px 0; }
+  .hud-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+  h1 {
+    margin: 0; font-size: 22px; letter-spacing: 3px; font-weight: 800;
+    background: linear-gradient(180deg, #7A4A22 0%, #A9682C 60%, #C4843C 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 1px 0 rgba(255,255,255,.65));
+  }
+  .sub { font-size: 11px; color: var(--ink2); margin-top: 3px; letter-spacing: .6px; }
+
+  .icon {
+    width: 34px; height: 34px; border-radius: 50%; padding: 0; font-size: 15px;
+    background: rgba(255,255,255,.5); color: #7A5230;
+    border: 1px solid rgba(150,105,60,.28);
+    box-shadow: 0 2px 0 rgba(150,105,60,.16);
+    flex: 0 0 auto; line-height: 1;
+  }
+  .icon:active { transform: translateY(2px); box-shadow: none; }
+
+  .userbar {
+    display: flex; align-items: center; justify-content: space-between;
+    font-size: 11.5px; color: var(--ink2); margin-top: 10px; min-height: 26px;
+  }
+  .userbar .name { font-weight: 700; color: #6B4A2F; }
+  .badge {
+    font-size: 9.5px; padding: 2px 7px; border-radius: 20px; margin-left: 5px;
+    background: rgba(160,115,65,.16); color: #8A6038;
+  }
+
+  .score-row { text-align: center; margin-top: 2px; }
+  .score {
+    font-size: 58px; font-weight: 900; line-height: 1.05; letter-spacing: -1px;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(180deg, #B8621C 0%, #8A4512 55%, #6B3510 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,.75));
+    will-change: transform;
+  }
+  .score.bump { animation: scoreBump .26s cubic-bezier(.2,1.7,.42,1); }
+  @keyframes scoreBump {
+    0%   { transform: scale(1); }
+    42%  { transform: scale(1.16) translateY(-2px); }
+    100% { transform: scale(1); }
+  }
+  .score-label { font-size: 10.5px; color: var(--ink2); letter-spacing: 3px; margin-top: 1px; }
+
+  /* ---------- 舞台 ---------- */
+  .stage {
+    position: relative; z-index: 4;
+    flex: 1; min-height: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .pool {
+    position: absolute; left: 50%; top: 50%; width: 340px; height: 340px;
+    transform: translate(-50%, -46%);
+    background: radial-gradient(circle, rgba(255,246,225,.85) 0%, rgba(255,240,210,.42) 38%, rgba(255,235,200,0) 68%);
+    pointer-events: none;
+  }
+  .char-wrap { position: relative; display: inline-block; transform: translateY(-6%); }
+
+  .char-shadow {
+    position: absolute; left: 50%; bottom: -14px;
+    width: 184px; height: 36px; margin-left: -92px;
+    background: radial-gradient(ellipse at center, rgba(108,66,28,.42) 0%, rgba(108,66,28,.16) 55%, rgba(108,66,28,0) 76%);
+    transform-origin: 50% 50%;
+    will-change: transform, opacity;
+  }
+
   .poop {
     position: relative;
-    font-size: 92px; line-height: 1; cursor: pointer;
-    filter: drop-shadow(0 8px 6px rgba(90,58,30,.25));
-    display: inline-block; transform-origin: 50% 75%;
+    width: 216px; height: 216px;
+    cursor: pointer;
+    transform-origin: 50% 86%;
+    filter: drop-shadow(0 16px 12px rgba(112,70,32,.22));
+    will-change: transform;
   }
-  /* 挤出过程：先压扁蓄力 -> 慢慢拉长挤出来 -> 断开 Q弹回弹 */
-  .poop.pop { animation: squeezeOut .78s cubic-bezier(.34,1.2,.64,1) !important; }
-  @keyframes squeezeOut {
-    0%   { transform: scale(1, 1) translateY(0) rotate(0); }
-    12%  { transform: scale(1.18, .52) translateY(16px) rotate(2deg); }
-    34%  { transform: scale(.82, 1.5) translateY(-8px) rotate(-4deg); }
-    52%  { transform: scale(.9, 1.28) translateY(1px) rotate(3deg); }
-    70%  { transform: scale(1.14, .86) translateY(-5px) rotate(-3deg); }
-    86%  { transform: scale(.95, 1.08) translateY(1px) rotate(1deg); }
-    100% { transform: scale(1, 1) translateY(0) rotate(0); }
+  .poop:focus { outline: none; }
+  .poop-svg { width: 100%; height: 100%; display: block; overflow: visible; }
+
+  /* 角色色板（皮肤 = 调色，而不是滤镜）；四层由深到浅，让层次读得出来 */
+  .p-body  { fill: var(--body); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
+  .p-dark  { fill: var(--dark); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
+  .p-light { fill: var(--light); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
+  .p-t1, .p-t2, .p-t3, .p-t4 { transition: fill .45s cubic-bezier(.3,.8,.3,1); }
+  .p-t1 { fill: var(--t1); }
+  .p-t2 { fill: var(--t2); }
+  .p-t3 { fill: var(--t3); }
+  .p-t4 { fill: var(--t4); }
+  .p-blush { fill: var(--blush); }
+  .p-white { fill: #fff; }
+  .p-ink   { fill: #2E1C0F; }
+  .gloss  { fill: #fff; }
+  .eye-w  { fill: #FFFFFF; }
+  .eye-p  { fill: #2A1B10; }
+  .eye-g  { fill: #FFFFFF; }
+
+  /* 眨眼 */
+  .eyes { animation: blink 4.6s infinite; transform-origin: 0 0; }
+  @keyframes blink {
+    0%, 92%, 100% { transform: translateY(118px) scaleY(1) translateY(-118px); }
+    94%           { transform: translateY(118px) scaleY(.1) translateY(-118px); }
+    96%           { transform: translateY(118px) scaleY(1.08) translateY(-118px); }
   }
-  .poop.idle { animation: poopIdle 2.6s ease-in-out infinite; }
-  @keyframes poopIdle {
-    0%,100% { transform: scale(1) translateY(0); }
-    50%     { transform: scale(1.04) translateY(-5px); }
+
+  /* 嘴巴状态 */
+  .mouth-smile { opacity: 1; transition: opacity .12s; }
+  .mouth-open  { opacity: 0; transition: opacity .12s; }
+  .charge .mouth-smile { opacity: 0; }
+  .charge .mouth-open  { opacity: 1; }
+
+  /* 彩虹皮肤：整只循环变色 */
+  .rainbow { animation: rainbowHue 3.4s linear infinite; }
+  @keyframes rainbowHue { from { filter: hue-rotate(0deg); } to { filter: hue-rotate(360deg); } }
+
+  /* 装饰：墨镜 / 超人 */
+  .deco { display: none; }
+  .skin-shades .deco-shades { display: block; }
+  .skin-shades .eyes { opacity: 0; }
+  .skin-super .deco-super { display: block; }
+  .skin-super .eyes { opacity: 0; }
+  .capeSlot { display: none; }
+  .skin-super .capeSlot { display: block; animation: capeFlutter 3.2s ease-in-out infinite; }
+  @keyframes capeFlutter {
+    0%, 100% { transform: rotate(-1.6deg) scaleY(1); }
+    50%      { transform: rotate(2.2deg) scaleY(1.02); }
   }
-  /* 彩虹皮肤专属流光 */
-  .poop.skin-rainbow { animation: rainbowHue 3s linear infinite; }
-  @keyframes rainbowHue { from { filter: hue-rotate(0) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } to { filter: hue-rotate(360deg) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } }
-  /* 拉丝：慢慢被拉出来的黏连感 */
-  .strain {
-    position: absolute; left: 50%; top: 88%; width: 0; height: 0;
-    transform: translateX(-50%); opacity: 0; pointer-events: none;
-    background: linear-gradient(180deg, #a9713c 0%, #7d4f24 70%, transparent 100%);
-    border-radius: 3px 3px 50% 50% / 2px 2px 100% 100%;
+
+  .hint {
+    position: absolute; left: 50%; bottom: calc(100% + 2px); z-index: 7;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 2px;
+    font-size: 12px; font-weight: 700; color: #A8763E;
+    letter-spacing: 1px; pointer-events: none;
+    animation: hintBob 1.9s ease-in-out infinite;
   }
-  .strain.grow { animation: strainGrow .78s ease-out forwards; }
-  @keyframes strainGrow {
-    0%   { height: 0;  width: 26px; opacity: 0; }
-    18%  { height: 14px; width: 24px; opacity: .95; }
-    38%  { height: 40px; width: 15px; opacity: .95; }
-    56%  { height: 52px; width: 10px; opacity: .85; }
-    72%  { height: 22px; width: 7px;  opacity: 0; }
-    100% { height: 0;  width: 5px;  opacity: 0; }
+  .hint .hand { font-size: 20px; filter: drop-shadow(0 3px 4px rgba(140,95,50,.3)); }
+  @keyframes hintBob {
+    0%, 100% { transform: translate(-50%, 0); opacity: .75; }
+    50%      { transform: translate(-50%, 7px); opacity: 1; }
   }
-  /* 皮肤装饰：墨镜 / 超人 */
-  .poop-deco { position: absolute; pointer-events: none; line-height: 1; display: none; }
-  .poop-deco.shades { font-size: 40px; left: 50%; top: 26px; transform: translateX(-50%); }
-  .poop-deco.super  { font-size: 46px; right: -20px; top: -16px; }
-  .skin-emoji { position: relative; display: inline-block; }
-  .skin-deco { position: absolute; pointer-events: none; line-height: 1; }
-  .skin-deco.shades { font-size: 22px; left: 50%; top: 16px; transform: translateX(-50%); }
-  .skin-deco.super  { font-size: 24px; right: -12px; top: -10px; }
+  .hint.gone { display: none; }
+  .fx { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
+
+  /* ---------- 连击 ---------- */
+  .combo {
+    position: absolute; right: 18px; top: 4px; z-index: 7;
+    display: flex; align-items: baseline; gap: 2px;
+    padding: 5px 11px; border-radius: 20px;
+    background: rgba(255,255,255,.62);
+    box-shadow: 0 4px 14px rgba(140,95,50,.18);
+    color: #B4581B; font-weight: 900;
+    opacity: 0; transform: translateY(-6px) scale(.9);
+    transition: opacity .18s, transform .18s cubic-bezier(.2,1.5,.4,1);
+  }
+  .combo.on { opacity: 1; transform: translateY(0) scale(1); }
+  .combo .x { font-size: 11px; opacity: .75; }
+  .combo .n { font-size: 19px; font-variant-numeric: tabular-nums; }
+  .combo.hot { background: linear-gradient(180deg,#FFD79A,#FFB65C); color: #8A3A08; }
+  .combo.blaze { background: linear-gradient(180deg,#FFB25C,#FF7A3C); color: #571A02;
+                 box-shadow: 0 4px 18px rgba(255,110,50,.5); }
+
+  /* ---------- footer ---------- */
+  .foot { position: relative; z-index: 5; padding: 0 18px 18px; }
+  .bar-wrap { width: 100%; max-width: 340px; margin: 0 auto; }
+  .bar-label {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--ink2); margin-bottom: 7px;
+    font-variant-numeric: tabular-nums;
+  }
+  .bar-label b { color: #7A4A22; font-size: 12px; letter-spacing: .5px; }
+  .bar {
+    position: relative; height: 17px; border-radius: 12px; overflow: hidden;
+    background: linear-gradient(180deg, #E3CBAB, #D5B58C);
+    box-shadow: inset 0 2px 4px rgba(120,80,40,.22), inset 0 -1px 0 rgba(255,255,255,.6);
+  }
+  .bar > i {
+    display: block; height: 100%; width: 0%;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #FFC972 0%, #E9A33C 45%, #CE7E28 100%);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 12px rgba(233,163,60,.55);
+    transition: width .34s cubic-bezier(.25,.9,.25,1);
+  }
+  .bar-shine {
+    position: absolute; top: 0; bottom: 0; width: 44px;
+    background: linear-gradient(100deg, rgba(255,255,255,0) 0%, rgba(255,255,255,.55) 50%, rgba(255,255,255,0) 100%);
+    animation: shineSweep 3.4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes shineSweep {
+    0%   { left: -50px; opacity: 0; }
+    35%  { opacity: .9; }
+    70%  { left: 105%; opacity: 0; }
+    100% { left: 105%; opacity: 0; }
+  }
+  .msg {
+    min-height: 19px; font-size: 11.5px; color: var(--ink2);
+    text-align: center; margin: 9px 0 10px; letter-spacing: .3px;
+  }
+  .btns { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
+
+  /* ---------- 按钮 ---------- */
+  button {
+    border: 0; border-radius: 13px; padding: 11px 17px;
+    font: inherit; font-size: 13px; font-weight: 700; letter-spacing: .5px;
+    color: #FFF8EC; cursor: pointer;
+    background: linear-gradient(180deg, #96602F 0%, #744522 100%);
+    box-shadow: 0 3px 0 #4F2E14, 0 7px 14px rgba(79,46,20,.24);
+    transition: transform .07s ease, box-shadow .07s ease, filter .15s;
+  }
+  button:active { transform: translateY(3px); box-shadow: 0 0 0 #4F2E14; filter: brightness(1.06); }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost {
+    background: linear-gradient(180deg, #FFFDF6 0%, #F1DDBC 100%);
+    color: #744522;
+    box-shadow: 0 3px 0 rgba(150,105,60,.28), 0 6px 12px rgba(120,80,40,.16);
+  }
+  button.ghost:active { box-shadow: 0 0 0 rgba(150,105,60,.28); }
+  button.sm { padding: 6px 12px; font-size: 11.5px; border-radius: 10px; box-shadow: 0 2px 0 rgba(120,80,40,.2), 0 4px 8px rgba(120,80,40,.14); }
+  button.sm:active { transform: translateY(2px); box-shadow: none; }
+
+  /* ---------- 浮层 ---------- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50; display: none;
+    align-items: center; justify-content: center; padding: 16px;
+    background: rgba(58,38,18,.46);
+    -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
+  }
+  .overlay.show { display: flex; animation: fadeIn .22s ease-out; }
+  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+  .card {
+    width: min(100%, 386px); max-height: 86vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+    background: linear-gradient(180deg, #FFFDF6 0%, #FEF6E6 100%);
+    border-radius: 22px; padding: 20px;
+    box-shadow: 0 24px 60px rgba(48,28,10,.42), inset 0 1px 0 #fff;
+    animation: sheetIn .3s cubic-bezier(.2,1.3,.35,1);
+  }
+  @keyframes sheetIn {
+    from { opacity: 0; transform: translateY(26px) scale(.96); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .card h2 { margin: 0 0 14px; font-size: 17px; text-align: center; letter-spacing: 1px; color: #6B4222; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 14px; padding: 4px; border-radius: 13px; background: #F0DEC0; }
+  .tabs button { flex: 1; background: transparent; color: #8A6038; box-shadow: none; padding: 9px; border-radius: 10px; }
+  .tabs button.on { background: linear-gradient(180deg,#96602F,#744522); color: #FFF8EC; box-shadow: 0 2px 6px rgba(120,80,40,.24); }
+  .field { margin-bottom: 11px; }
+  .field label { display: block; font-size: 11px; color: var(--ink2); margin-bottom: 5px; letter-spacing: .4px; }
+  .field input {
+    width: 100%; padding: 11px 13px; font-size: 15px; color: #4B2E16;
+    border: 1.5px solid #E4CCA8; border-radius: 12px;
+    background: #FFFDF9; outline: none; transition: border-color .16s, box-shadow .16s;
+  }
+  .field input:focus { border-color: #E9A33C; box-shadow: 0 0 0 3px rgba(233,163,60,.18); }
+  .card-msg { min-height: 17px; font-size: 11.5px; color: #B05252; text-align: center; margin: 4px 0 8px; }
+  .card .primary { width: 100%; margin-top: 2px; padding: 13px; }
+  .card .close { width: 100%; margin-top: 12px; background: transparent; color: #96734E; box-shadow: none; font-size: 12.5px; }
+  .card .close:active { box-shadow: none; transform: scale(.98); }
+
+  /* ---------- 皮肤面板 ---------- */
+  .skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+  .skin-item {
+    position: relative; padding: 8px 4px 7px; border-radius: 15px; text-align: center;
+    cursor: pointer; background: #FFFDF9;
+    border: 1.5px solid #EDD9B8;
+    transition: transform .12s cubic-bezier(.2,1.4,.4,1), border-color .16s, box-shadow .16s;
+    overflow: hidden;
+  }
+  .skin-item:active { transform: scale(.94); }
+  .skin-item.on {
+    border-color: #E9A33C;
+    background: linear-gradient(180deg, #FFF6E3, #FDEBCB);
+    box-shadow: 0 0 0 3px rgba(233,163,60,.22), 0 6px 16px rgba(200,140,60,.24);
+  }
+  .skin-item.locked { opacity: .92; cursor: default; background: #F7EFE1; }
+  .skin-item.locked .pv { filter: grayscale(.72) brightness(.96); }
+  .pv { display: block; line-height: 0; margin-bottom: 2px; }
+  .pv svg { width: 52px; height: 52px; }
+  .skin-name { font-size: 11.5px; font-weight: 700; color: #6B4222; }
+  .skin-cond { font-size: 9.5px; color: #A2855F; margin-top: 2px; min-height: 12px; }
+  .skin-item.on .skin-cond { color: #C2762A; font-weight: 700; }
+  .lock-tag {
+    position: absolute; top: 5px; right: 5px; font-size: 10px;
+    padding: 1px 5px; border-radius: 8px;
+    background: rgba(120,85,50,.12); color: #8A6038;
+  }
+
+  /* ---------- 排行榜 ---------- */
+  .rank-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 9px 8px; border-radius: 11px; font-size: 13px;
+    border-bottom: 1px dashed #EEDCBD;
+  }
+  .rank-row:last-child { border-bottom: 0; }
+  .rank-row .no { width: 20px; font-weight: 800; color: #A2855F; font-variant-numeric: tabular-nums; }
+  .rank-row .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rank-row .sc { font-weight: 800; color: #8A4512; font-variant-numeric: tabular-nums; }
+  .rank-row.me { background: linear-gradient(90deg, rgba(233,163,60,.16), rgba(233,163,60,.03)); }
+  .rank-row.me .no, .rank-row.me .sc { color: #C06A22; }
+  .rank-row.top1 .no { color: #D79A2A; }
+  .rank-empty { text-align: center; color: var(--ink2); font-size: 12.5px; padding: 22px 0; }
+
+  /* ---------- 飘字 / 提示 ---------- */
   .pop-num {
-    position: fixed; pointer-events: none; z-index: 60;
-    font-size: 26px; font-weight: 800; color: #b05252;
-    text-shadow: 0 2px 4px rgba(255,255,255,.7);
-    animation: popNum .7s ease-out forwards;
+    position: fixed; z-index: 60; pointer-events: none;
+    font-size: 26px; font-weight: 900; color: #FFFCF0;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 2px 0 #A8541C, -1px 0 0 #A8541C, 1px 0 0 #A8541C, 0 -1px 0 #A8541C, 0 6px 14px rgba(140,90,45,.35);
+    animation: popNum .82s cubic-bezier(.18,.9,.24,1) forwards;
+    will-change: transform, opacity;
   }
   @keyframes popNum {
-    0%   { opacity: 1; transform: translateY(0) scale(.7); }
-    30%  { transform: translateY(-18px) scale(1.2); }
-    100% { opacity: 0; transform: translateY(-70px) scale(1); }
-  }
-  .spark {
-    position: fixed; pointer-events: none; z-index: 59; font-size: 18px;
-    animation: sparkFly .6s ease-out forwards;
-  }
-  @keyframes sparkFly {
-    0%   { opacity: 1; transform: translate(0,0) scale(.5); }
-    100% { opacity: 0; transform: translate(var(--dx),var(--dy)) scale(1.2) rotate(180deg); }
+    0%   { opacity: 0; transform: translate(-50%, 6px) scale(.55); }
+    22%  { opacity: 1; transform: translate(-50%, -14px) scale(1.18); }
+    38%  { transform: translate(-50%, -20px) scale(1); }
+    100% { opacity: 0; transform: translate(calc(-50% + var(--dx, 0px)), -78px) scale(.92); }
   }
 
-  .bar-wrap { width: 100%; max-width: 320px; }
-  .bar-label { display: flex; justify-content: space-between; font-size: 12px; color: #8a6a48; margin-bottom: 6px; }
-  .bar { height: 14px; background: #d9bb90; border-radius: 10px; overflow: hidden; }
-  .bar > i { display: block; height: 100%; width: 0%; background: linear-gradient(90deg,#c98a3c,#e0a94f); transition: width .15s; }
-  .msg { min-height: 20px; font-size: 13px; color: #9c7c56; text-align: center; }
-  .btns { display: flex; gap: 10px; margin-top: 6px; flex-wrap: wrap; justify-content: center; }
-  button {
-    border: 0; border-radius: 12px; padding: 11px 18px; font-size: 14px;
-    background: #6b4a2f; color: #fff; cursor: pointer;
+  .banner {
+    position: absolute; left: 0; right: 0; top: 27%; z-index: 61;
+    text-align: center; pointer-events: none;
+    font-size: 26px; font-weight: 900; letter-spacing: 2px;
+    color: #FFF9EC; opacity: 0;
+    text-shadow: 0 3px 0 #A75B22, 0 0 26px rgba(255,180,90,.8);
   }
-  button.ghost { background: transparent; color: #6b4a2f; border: 2px solid #6b4a2f; }
-  button.sm { padding: 6px 12px; font-size: 12px; }
-  button:active { transform: scale(.95); }
-  button:disabled { opacity: .5; cursor: default; }
+  .banner.show { animation: bannerPop 1.5s cubic-bezier(.2,1.2,.3,1) forwards; }
+  @keyframes bannerPop {
+    0%   { opacity: 0; transform: scale(.7) translateY(10px); }
+    18%  { opacity: 1; transform: scale(1.1) translateY(0); }
+    30%  { transform: scale(1); }
+    72%  { opacity: 1; transform: scale(1) translateY(-6px); }
+    100% { opacity: 0; transform: scale(1.04) translateY(-24px); }
+  }
 
-  .overlay {
-    position: fixed; inset: 0; background: rgba(60,40,20,.5);
-    display: none; align-items: center; justify-content: center; z-index: 50; padding: 16px;
+  .toast {
+    position: absolute; left: 50%; bottom: 132px; z-index: 62;
+    transform: translate(-50%, 10px); opacity: 0; pointer-events: none;
+    padding: 8px 15px; border-radius: 20px; white-space: nowrap;
+    font-size: 12px; font-weight: 600; color: #FFF9EC;
+    background: rgba(84, 52, 24, .82);
+    box-shadow: 0 8px 22px rgba(60,35,12,.34);
+    -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+    transition: opacity .2s, transform .24s cubic-bezier(.2,1.4,.4,1);
   }
-  .overlay.show { display: flex; }
-  .card {
-    background: #fff8ea; border-radius: 18px; padding: 22px; width: min(100%, 380px);
-    max-height: 86vh; overflow-y: auto;
-    box-shadow: 0 12px 40px rgba(60,40,20,.3);
-  }
-  .card h2 { margin: 0 0 14px; font-size: 19px; text-align: center; }
-  .tabs { display: flex; gap: 6px; margin-bottom: 14px; }
-  .tabs button { flex: 1; background: #e8d4b4; color: #6b4a2f; }
-  .tabs button.on { background: #6b4a2f; color: #fff; }
-  .field { margin-bottom: 10px; }
-  .field label { display: block; font-size: 12px; color: #8a6a48; margin-bottom: 4px; }
-  .field input {
-    width: 100%; padding: 10px 12px; font-size: 15px; border: 2px solid #d9bb90;
-    border-radius: 10px; background: #fffdf8; outline: none;
-  }
-  .field input:focus { border-color: #c98a3c; }
-  .card-msg { min-height: 18px; font-size: 12px; color: #b05252; text-align: center; margin: 6px 0; }
-  .card .primary { width: 100%; margin-top: 4px; }
-  .card .close { width: 100%; margin-top: 8px; background: transparent; color: #8a6a48; }
-  .rank-row { display: flex; justify-content: space-between; padding: 8px 4px; border-bottom: 1px dashed #e0c9a6; font-size: 14px; }
-  .rank-row:last-child { border-bottom: 0; }
-  .rank-row.me { color: #c98a3c; font-weight: 700; }
-  .rank-empty { text-align: center; color: #9c7c56; font-size: 13px; padding: 20px 0; }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
 
-  /* ---- 皮肤面板 ---- */
-  .skin-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
-  .skin-item {
-    border: 2px solid #e0c9a6; border-radius: 14px; padding: 12px 6px;
-    text-align: center; cursor: pointer; background: #fffdf8; transition: transform .1s, border-color .15s;
+  /* 降低动效偏好 */
+  @media (prefers-reduced-motion: reduce) {
+    .eyes, .bar-shine, .rainbow, .skin-super .cape { animation: none !important; }
+    .poop-svg .eyes { transform: none; }
   }
-  .skin-item:active { transform: scale(.95); }
-  .skin-item.on { border-color: #c98a3c; background: #fbeed6; }
-  .skin-item.locked { opacity: .55; cursor: default; }
-  .skin-emoji { font-size: 42px; line-height: 1.1; display: block; margin-bottom: 4px; }
-  .skin-name { font-size: 13px; font-weight: 700; }
-  .skin-cond { font-size: 11px; color: #9c7c56; margin-top: 2px; }
-  .skin-on-tag { font-size: 10px; color: #c98a3c; font-weight: 700; }
+
+  @media (max-height: 680px) {
+    .score { font-size: 42px; }
+    .poop { width: 158px; height: 158px; }
+    .char-shadow { width: 136px; margin-left: -68px; }
+    .pool { width: 240px; height: 240px; }
+  }
 </style>
 </head>
 <body>
 <div id="game">
-  <div class="head">
-    <h1>💩 拉屎大作战</h1>
-    <div class="sub">点一点，攒便便，冲上排行榜</div>
+  <div class="wall" aria-hidden="true"></div>
+  <div class="floor" aria-hidden="true"></div>
+  <canvas id="bgfx" class="bgfx" aria-hidden="true"></canvas>
+
+  <header class="hud">
+    <div class="hud-top">
+      <div class="brand">
+        <h1>拉屎大作战</h1>
+        <div class="sub">点一点 · 攒便便 · 冲榜</div>
+      </div>
+      <button id="soundBtn" class="icon" aria-label="音效开关">🔊</button>
+    </div>
     <div class="userbar">
       <span id="userinfo">未登录 <span class="badge" id="mode">本地</span></span>
       <span id="useracts"><button id="login" class="sm ghost">登录 / 注册</button></span>
     </div>
+    <div class="score-row">
+      <div class="score" id="score">0</div>
+      <div class="score-label">累计便便</div>
+    </div>
+  </header>
+
+  <div class="stage" id="stage">
+    <div class="pool" aria-hidden="true"></div>
+    <div class="char-wrap">
+      <div class="hint" id="hint"><span class="hand">👆</span>点这里</div>
+      <div class="char-shadow" id="charShadow"></div>
+      <div class="poop" id="poop" role="button" tabindex="0" aria-label="点击拉屎"></div>
+    </div>
+    <div class="combo" id="combo" aria-hidden="true"><span class="x">连击</span><span class="n" id="comboNum">1</span></div>
+    <canvas id="fx" class="fx" aria-hidden="true"></canvas>
   </div>
 
-  <div class="score-box">
-    <div class="score" id="score">0</div>
-    <div class="score-label">累计便便</div>
-  </div>
+  <footer class="foot">
+    <div class="bar-wrap">
+      <div class="bar-label"><span><b id="barLv">Lv.1</b></span><span id="barPct">0 / 10</span></div>
+      <div class="bar"><i id="bar"></i><span class="bar-shine"></span></div>
+    </div>
+    <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
+    <div class="btns">
+      <button id="skin" class="ghost">🎨 皮肤</button>
+      <button id="rank" class="ghost">🏆 排行</button>
+      <button id="reset" class="ghost">重新开始</button>
+    </div>
+  </footer>
 
-  <div class="poop-wrap">
-    <span class="poop idle" id="poop" role="button" aria-label="点击拉屎">💩<span class="poop-deco" id="poopDeco"></span></span>
-    <span class="strain" id="strain"></span>
-  </div>
-
-  <div class="bar-wrap">
-    <div class="bar-label"><span>升级进度</span><span id="lv">Lv.1</span></div>
-    <div class="bar"><i id="bar"></i></div>
-  </div>
-
-  <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
-  <div class="btns">
-    <button id="skin" class="ghost">🎨 皮肤</button>
-    <button id="rank" class="ghost">🏆 排行榜</button>
-    <button id="reset" class="ghost">重新开始</button>
-  </div>
+  <div class="banner" id="banner" aria-hidden="true"></div>
+  <div class="toast" id="toast" aria-hidden="true"></div>
+  <div class="vig" aria-hidden="true"></div>
 </div>
 
 <!-- 皮肤 -->
@@ -235,226 +501,6 @@
 <script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js" onerror="window.__sdkFailed=true"></script>
 <script src="config.js"></script>
 <script src="cloud.js"></script>
-<script>
-(function () {
-  var score = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
-  var $ = function (id) { return document.getElementById(id); };
-
-  // ---- 皮肤定义（按最高分解锁）----
-  var SKINS = [
-    { id:'classic',  name:'经典屎', emoji:'💩', filter:'none', need:0,   spark:'💩' },
-    { id:'gold',     name:'黄金屎', emoji:'💩', filter:'sepia(1) saturate(5) hue-rotate(2deg) brightness(1.12)', need:10,  spark:'✨' },
-    { id:'jade',     name:'翡翠屎', emoji:'💩', filter:'hue-rotate(85deg) saturate(2.2)', need:30,  spark:'🍀' },
-    { id:'ice',      name:'冰爽屎', emoji:'💩', filter:'hue-rotate(175deg) saturate(2) brightness(1.05)', need:60, spark:'❄️' },
-    { id:'grape',    name:'紫晶屎', emoji:'💩', filter:'hue-rotate(260deg) saturate(2.4)', need:100, spark:'🔮' },
-    { id:'lava',     name:'岩浆屎', emoji:'💩', filter:'hue-rotate(-28deg) saturate(4) brightness(1.08)', need:150, spark:'🔥' },
-    { id:'rainbow',  name:'彩虹屎', emoji:'💩', filter:'none', cls:'skin-rainbow', need:200, spark:'🌈' },
-    { id:'shades',   name:'墨镜屎', emoji:'💩', filter:'none', need:250, spark:'🕶️', deco:'🕶️', decoPos:'shades' },
-    { id:'super',    name:'超人屎', emoji:'💩', filter:'none', need:300, spark:'🦸', deco:'🦸', decoPos:'super' }
-  ];
-  var curSkin = 'classic';
-  try { curSkin = localStorage.getItem('ls_skin') || 'classic'; } catch (e) {}
-  function skinById(id) { for (var i=0;i<SKINS.length;i++) if (SKINS[i].id===id) return SKINS[i]; return SKINS[0]; }
-  function applySkin() {
-    var s = skinById(curSkin);
-    var el = $('poop');
-    var deco = $('poopDeco');
-    if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = s.emoji;
-    else el.insertBefore(document.createTextNode(s.emoji), deco);
-    el.style.filter = (s.filter && s.filter!=='none') ? s.filter : '';
-    el.className = 'poop idle' + (s.cls ? ' ' + s.cls : '');
-    if (s.deco) {
-      deco.textContent = s.deco;
-      deco.className = 'poop-deco ' + (s.decoPos || '');
-      deco.style.display = 'block';
-    } else {
-      deco.textContent = '';
-      deco.className = 'poop-deco';
-      deco.style.display = 'none';
-    }
-  }
-  function unlocked(s) { return best >= s.need; }
-
-  function need(n) { return 10 * n * n; }
-  function render() {
-    $('score').textContent = score;
-    $('lv').textContent = 'Lv.' + lv;
-    $('bar').style.width = Math.min(100, (score - need(lv - 1)) / (need(lv) - need(lv - 1)) * 100) + '%';
-    $('best').textContent = best;
-  }
-  function localBest() { try { return parseInt(localStorage.getItem('ls_best') || '0', 10) || 0; } catch (e) { return 0; } }
-  function setLocalBest(v) { try { localStorage.setItem('ls_best', v); } catch (e) {} }
-
-  function refreshUser() {
-    var me = window.CloudAuth.me();
-    if (me) {
-      $('userinfo').innerHTML = '<span class="name">' + me.nickname + '</span> <span class="badge">' + (cloudOn ? '云端' : '本地') + '</span>';
-      $('useracts').innerHTML = '<button id="logout" class="sm ghost">退出</button>';
-      $('logout').onclick = function () {
-        window.CloudAuth.logout();
-        best = localBest(); refreshUser(); render(); renderSkins();
-      };
-    } else {
-      $('userinfo').innerHTML = '未登录 <span class="badge" id="mode">' + (cloudOn ? '云端' : '本地') + '</span>';
-      $('useracts').innerHTML = '<button id="login" class="sm ghost">登录 / 注册</button>';
-      $('login').onclick = openAuth;
-    }
-    $('mode') && ($('mode').textContent = cloudOn ? '云端' : '本地');
-  }
-
-  function scheduleSave() {
-    var me = window.CloudAuth.me();
-    if (!cloudOn || !me) return;
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () {
-      window.CloudAuth.pushBest(me.user, best);
-    }, (window.LS_CONFIG && window.LS_CONFIG.SAVE_DEBOUNCE_MS) || 1500);
-  }
-
-  // ---- 点击：Q弹 + 飘字 + 火花 + 分数弹跳 ----
-  function floatPop(e) {
-    var wrap = $('poop').getBoundingClientRect();
-    var num = document.createElement('div');
-    num.className = 'pop-num';
-    num.textContent = '+1';
-    num.style.left = (wrap.left + wrap.width/2 + (Math.random()-0.5)*46) + 'px';
-    num.style.top = (wrap.top + 16) + 'px';
-    document.body.appendChild(num);
-    setTimeout(function () { if (num.parentNode) num.parentNode.removeChild(num); }, 720);
-
-    var s = skinById(curSkin);
-    for (var i=0;i<3;i++) {
-      var sp = document.createElement('div');
-      sp.className = 'spark';
-      sp.textContent = s.spark;
-      sp.style.left = (wrap.left + wrap.width/2 - 10) + 'px';
-      sp.style.top = (wrap.top + wrap.height/2 - 10) + 'px';
-      sp.style.setProperty('--dx', ((Math.random()-0.5)*120) + 'px');
-      sp.style.setProperty('--dy', (-40 - Math.random()*70) + 'px');
-      document.body.appendChild(sp);
-      (function (node) { setTimeout(function () { if (node.parentNode) node.parentNode.removeChild(node); }, 620); })(sp);
-    }
-  }
-
-  $('poop').addEventListener('click', function (e) {
-    score++;
-    var el = $('poop');
-    el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
-    var strain = $('strain');
-    strain.classList.remove('grow'); void strain.offsetWidth; strain.classList.add('grow');
-    $('score').classList.add('bump');
-    setTimeout(function () { $('score').classList.remove('bump'); }, 120);
-    floatPop(e);
-    if (score > best) {
-      best = score; setLocalBest(best); scheduleSave();
-      // 解锁新皮肤时提示
-      for (var i=0;i<SKINS.length;i++) {
-        if (SKINS[i].need === best) { $('msg').textContent = '🎉 解锁新皮肤：' + SKINS[i].name; renderSkins(); break; }
-      }
-    }
-    while (score >= need(lv)) { lv++; $('msg').textContent = '升级啦！Lv.' + lv; }
-    render();
-  });
-  $('reset').addEventListener('click', function () { score = 0; lv = 1; $('msg').textContent = '重新开始'; render(); });
-
-  // ---- 皮肤面板 ----
-  function renderSkins() {
-    $('skinGrid').innerHTML = SKINS.map(function (s) {
-      var ok = unlocked(s);
-      var on = s.id === curSkin;
-      var cls = 'skin-item' + (on ? ' on' : '') + (ok ? '' : ' locked');
-      var filterCss = (s.filter && s.filter!=='none') ? ('filter:' + s.filter + ';') : '';
-      var cond = ok ? (on ? '<div class="skin-on-tag">使用中</div>' : '') : ('🔒 最高分 ' + s.need);
-      var decoHtml = s.deco ? '<span class="skin-deco ' + (s.decoPos||'') + '">' + s.deco + '</span>' : '';
-      return '<div class="' + cls + '" data-skin="' + s.id + '">' +
-        '<span class="skin-emoji" style="' + filterCss + '">' + s.emoji + decoHtml + '</span>' +
-        '<div class="skin-name">' + s.name + '</div>' +
-        '<div class="skin-cond">' + cond + '</div></div>';
-    }).join('');
-    Array.prototype.forEach.call($('skinGrid').querySelectorAll('[data-skin]'), function (item) {
-      item.onclick = function () {
-        var s = skinById(item.getAttribute('data-skin'));
-        if (!unlocked(s)) { $('msg').textContent = '最高分达到 ' + s.need + ' 才能解锁「' + s.name + '」'; return; }
-        curSkin = s.id;
-        try { localStorage.setItem('ls_skin', curSkin); } catch (e) {}
-        applySkin(); renderSkins();
-        $('msg').textContent = '已换上「' + s.name + '」';
-      };
-    });
-  }
-  $('skin').onclick = function () { renderSkins(); $('skinOverlay').classList.add('show'); };
-  $('skinClose').onclick = function () { $('skinOverlay').classList.remove('show'); };
-  $('skinOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
-
-  // ---- 登录/注册 UI ----
-  var authMode = 'login';
-  function setAuthMode(m) {
-    authMode = m;
-    $('tabLogin').className = m === 'login' ? 'on' : '';
-    $('tabReg').className = m === 'reg' ? 'on' : '';
-    $('authTitle').textContent = m === 'login' ? '登录' : '注册';
-    $('authSubmit').textContent = m === 'login' ? '登录' : '注册';
-    $('authMsg').textContent = '';
-  }
-  function openAuth() { $('authOverlay').classList.add('show'); setAuthMode('login'); $('au').focus(); }
-  $('tabLogin').onclick = function () { setAuthMode('login'); };
-  $('tabReg').onclick = function () { setAuthMode('reg'); };
-  $('authClose').onclick = function () { $('authOverlay').classList.remove('show'); };
-  $('authOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
-
-  $('authSubmit').onclick = function () {
-    var u = $('au').value, p = $('ap').value;
-    $('authMsg').textContent = '处理中…';
-    var fn = authMode === 'login' ? window.CloudAuth.login : window.CloudAuth.register;
-    fn(u, p).then(function (res) {
-      $('authMsg').textContent = res.msg || '';
-      if (!res.ok) return;
-      if (authMode === 'reg') { setAuthMode('login'); return; }
-      $('authOverlay').classList.remove('show');
-      refreshUser();
-      if (res.me && cloudOn) {
-        window.CloudAuth.pullBest(res.me.user).then(function (b) {
-          var newBest = b > localBest() ? b : localBest();
-          if (newBest !== best) { best = newBest; setLocalBest(best); render(); renderSkins(); }
-        });
-      }
-    });
-  };
-
-  // ---- 排行榜 UI ----
-  $('rank').onclick = function () {
-    $('rankOverlay').classList.add('show');
-    $('rankList').innerHTML = '<div class="rank-empty">加载中…</div>';
-    if (!cloudOn) {
-      $('rankList').innerHTML = '<div class="rank-empty">未启用云端模式，暂无排行榜<br>请在 config.js 填入环境 ID</div>';
-      return;
-    }
-    window.CloudAuth.ranking(20).then(function (rows) {
-      if (!rows.length) { $('rankList').innerHTML = '<div class="rank-empty">还没有人上榜</div>'; return; }
-      var me = window.CloudAuth.me();
-      $('rankList').innerHTML = rows.map(function (r, i) {
-        var cls = (me && r.user === me.user) ? ' class="rank-row me"' : ' class="rank-row"';
-        return '<div' + cls + '><span>' + (i + 1) + '. ' + r.nickname + '</span><span>💩 ' + r.best + '</span></div>';
-      }).join('');
-    });
-  };
-  $('rankClose').onclick = function () { $('rankOverlay').classList.remove('show'); };
-  $('rankOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
-
-  // ---- 启动 ----
-  cloudOn = window.CloudAuth.init();
-  applySkin();
-  refreshUser();
-  var me = window.CloudAuth.me();
-  if (cloudOn && me) {
-    window.CloudAuth.pullBest(me.user).then(function (b) {
-      if (b > 0) { best = b; setLocalBest(best); render(); renderSkins(); }
-    });
-  } else {
-    best = localBest();
-  }
-  render(); renderSkins();
-})();
-</script>
+<script src="game.js"></script>
 </body>
 </html>

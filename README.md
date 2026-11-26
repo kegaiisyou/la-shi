@@ -24,7 +24,8 @@ H5 点击小游戏。点击 💩 累计分数、升级；带账号系统，可�
 | 文件 | 作用 |
 |------|------|
 | `index.html` | 短地址入口（iframe 包装页） |
-| `game.html` | 游戏本体（本地开发用，含 UI + 逻辑） |
+| `game.html` | 游戏本体结构（UI + SVG 角色模板） |
+| `game.js` | 游戏逻辑（渲染/动画/粒子/音效/皮肤/账号 UI） |
 | `cloud.js` | CloudBase 账号层（匿名登录 + rdb 读写） |
 | `config.js` | 环境 ID 与参数配置 |
 | `docs/index.html` | 备用 iframe 包装页 |
@@ -34,13 +35,13 @@ H5 点击小游戏。点击 💩 累计分数、升级；带账号系统，可�
 
 ### 游戏本体改了之后（一键部署）
 
-改完 `game.html` / `cloud.js` / `config.js` 后，在项目目录运行：
+改完 `game.html` / `game.js` / `cloud.js` / `config.js` 后，在项目目录运行：
 
 ```
 powershell -ExecutionPolicy Bypass -File deploy.ps1
 ```
 
-脚本会自动把三个文件上传到 CloudBase 静态托管（本地 `game.html` 传成云端 `/index.html`）。
+脚本会自动把 4 个文件上传到 CloudBase 静态托管（本地 `game.html` 传成云端 `/index.html`）。
 前提：本机 `tcb` CLI 已登录（`tcb env list` 能看到 `la-shi-d9g35yrnaef3ef5b9`），凭据由 CLI 持久化保存，无需密钥。
 
 短地址（GitHub Pages）无需改动，它只是 iframe 包装。只有改短地址页面本身才需要 git 提交推送。
