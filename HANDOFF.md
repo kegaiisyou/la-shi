@@ -246,4 +246,34 @@ db332e7 feat: 添加一键部署脚本 deploy.ps1 并更新文档
 
 ---
 
-**最后更新**：2026-11-26（提交 `2b38e77`）
+---
+
+## 9. 刷榜漏洞根治（2026-11-26）
+
+**问题**：旧 UPDATE policy 是 `USING(true) WITH CHECK(true)`，anon 可直接改任意用户 `best`，只受"单次增量 ≤50"触发器限制——攻击者反复调用即可把任何人刷上榜首。
+
+**探索过的死路**：原计划开云函数权限走服务端写分。实测此 PG 环境 Web 匿名登录态 `callFunction` 在 `tcbopenapi` 链路下被平台默认拒绝（`EXCEED_AUTHORITY`）；OPA 策略（用 `tcb policy set`）无论 `allow if {true}` / `allow if {rt==functions, at==anon}` 都无法覆盖——deny 规则能回显生效、allow 不能翻盘。`DescribeResourcePermission`/`ModifyResourcePermission` 均报"当前 API 不支持 PostgreSQL 环境"。**结论：此环境 Web 匿名不能调云函数，别再走这条路。**
+
+**关键突破**：数据库**有 `auth.uid()` 函数**（`auth` schema），Web 匿名登录态下它返回当前 JWT sub（实测与 `auth.getLoginState().user.sub` 完全一致）。此前误判"RLS 拿不到 uid"是因为查了 `current_setting('request.jwt.claim.sub')`（该键确为 NULL）——**正确姿势是用 `auth.uid()`**。
+
+**最终方案**：RLS 行级隔离，无需云函数、无需改客户端代码：
+```sql
+DROP POLICY IF EXISTS ls_anon_update ON public.ls_users;
+CREATE POLICY ls_anon_update ON public.ls_users FOR UPDATE TO anon
+  USING (anon_uid = auth.uid()) WITH CHECK (anon_uid = auth.uid());
+DROP POLICY IF EXISTS ls_update ON public.ls_users;
+CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
+  USING (anon_uid = auth.uid()) WITH CHECK (anon_uid = auth.uid());
+```
+- 玩家只能改自己 `anon_uid = auth.uid()` 那一行，改别人返回 0 行（RLS 静默过滤，不报错）。
+- 配合既有触发器（增量 ≤50、anon_uid 不可变、best 非负）。
+- **实测**：两个独立匿名身份 A/B，A 改自己 best→成功(30)，A 改 B→`data:[]`；线上全流程（注册/登录/pullBest/pushBest=42/排行榜命中）全绿、0 pageerror。
+
+**副作用**：`anon_uid IS NULL` 的历史账号（早期测试号）不再能被任何人改分——预期行为，真实玩家注册时均绑定。
+
+**环境残留状态**：
+- OPA 策略当前为 `package authz.user / allow if { true }`（全放行，游戏不用云函数，无影响；无删除命令只能 set）。
+- 探针云函数 `lsProbe` 已删除；诊断函数 `dbg_my_uid*` 已删除；测试账号已清空。
+- 临时文件 `cloudbaserc.json` / `functions/` 及 `_*.py`/`_*.js` 探针在收尾时清理。
+
+**最后更新**：2026-11-26（RLS 行级隔离根治刷榜）

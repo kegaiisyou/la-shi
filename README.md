@@ -21,7 +21,7 @@ H5 长按憋屎小游戏。按住 💩 蓄力、憋满一格掉一坨计分；�
 - 登录态：localStorage，刷新免登录
 - 排行榜：按 `best` 倒序 Top 20
 - 防批量注册：注册时把当前匿名登录 uid（JWT `sub`）写入 `anon_uid` 列，唯一索引保证**一个设备身份只能注册一个账号**
-- 分数保护：数据库触发器限制单次提交增量 ≤50、`anon_uid` 绑定后不可改
+- 分数保护：RLS 行级隔离（anon 只能更新自己 `anon_uid = auth.uid()` 的那一行）+ 触发器限制单次提交增量 ≤50、`anon_uid` 绑定后不可改
 
 ## 文件结构
 
@@ -57,7 +57,8 @@ GRANT SELECT, INSERT, UPDATE ON public.ls_users TO anon;
 GRANT USAGE, SELECT ON SEQUENCE public.ls_users_id_seq TO anon;
 CREATE POLICY ls_anon_read ON public.ls_users FOR SELECT TO anon USING (true);
 CREATE POLICY ls_anon_insert ON public.ls_users FOR INSERT TO anon WITH CHECK (true);
-CREATE POLICY ls_anon_update ON public.ls_users FOR UPDATE TO anon USING (true) WITH CHECK (true);
+CREATE POLICY ls_anon_update ON public.ls_users FOR UPDATE TO anon USING (anon_uid = auth.uid()) WITH CHECK (anon_uid = auth.uid());
+CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated USING (anon_uid = auth.uid()) WITH CHECK (anon_uid = auth.uid());
 
 -- 防批量注册：一个匿名身份只能注册一个账号
 ALTER TABLE public.ls_users ADD COLUMN IF NOT EXISTS anon_uid text;
@@ -84,7 +85,11 @@ CREATE TRIGGER trg_ls_users_guard BEFORE UPDATE ON public.ls_users FOR EACH ROW 
 
 > 关键坑：匿名登录的 JWT 角色是 `anon` 不是 `authenticated`，必须给 `anon` 授予读写权限，否则注册报 `permission denied for table ls_users`。
 
-> 残留风险：实测 CloudBase PG 网关不把 JWT `sub` 注入 RLS 会话变量（`current_setting('request.jwt.claim.sub')` 为 NULL），云函数客户端调用默认被 `EXCEED_AUTHORITY` 拦截。因此目前 **anon 仍可直接 UPDATE 任意行**（受增量 ≤50 触发器限制）。要彻底堵住刷榜，需在控制台配置云函数访问权限，改为服务端可信写入并收回 anon 的 UPDATE 权限。
+> 刷榜防护（2026-11-26 已根治）：`auth.uid()` 在 Web 匿名登录态下**确实返回当前用户 JWT sub**（实测与 `auth.getLoginState().user.sub` 一致），只是此前查错了 setting 键 `request.jwt.claim.sub`（该键确为 NULL）。因此 UPDATE 策略收紧为 `anon_uid = auth.uid()`：任一玩家**只能改自己账号那一行**，无法改别人分数。实测：A 改自己 best 成功、改 B 的 best 返回 0 行。配合增量 ≤50 触发器，既防篡改他人，也防单次暴涨。
+>
+> 说明：无需云函数服务端写分。此前尝试 OPA 放通 Web 匿名 `callFunction` 失败（此 PG 环境 `tcbopenapi` 链路下 `anon` 身份调用云函数被平台默认拒绝，OPA 用户 allow 无法覆盖），行级隔离是更简洁可靠的方案。
+>
+> 旧账号兼容：`anon_uid` 为 NULL 的历史账号（如早期测试号）不再能被任何人更新分数——这是预期行为，真实玩家账号注册时均已绑定。
 
 ## GitHub
 
