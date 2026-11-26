@@ -34,20 +34,24 @@
   .score.bump { transform: scale(1.18); }
   .score-label { font-size: 12px; color: #9c7c56; }
 
-  /* ---- 便便本体 + Q弹动画 ---- */
-  .poop-wrap { position: relative; margin: 6px 0; }
+  /* ---- 便便本体 + 挤出动画 ---- */
+  .poop-wrap { position: relative; margin: 6px 0; display: inline-block; }
   .poop {
+    position: relative;
     font-size: 92px; line-height: 1; cursor: pointer;
     filter: drop-shadow(0 8px 6px rgba(90,58,30,.25));
-    display: inline-block; transform-origin: 50% 80%;
+    display: inline-block; transform-origin: 50% 75%;
   }
-  .poop.pop { animation: poopPop .42s cubic-bezier(.34,1.56,.64,1); }
-  @keyframes poopPop {
-    0%   { transform: scale(1) translateY(0) rotate(0); }
-    25%  { transform: scale(1.28) translateY(-10px) rotate(-9deg); }
-    50%  { transform: scale(.86) translateY(4px) rotate(6deg); }
-    72%  { transform: scale(1.09) translateY(-3px) rotate(-3deg); }
-    100% { transform: scale(1) translateY(0) rotate(0); }
+  /* 挤出过程：先压扁蓄力 -> 慢慢拉长挤出来 -> 断开 Q弹回弹 */
+  .poop.pop { animation: squeezeOut .78s cubic-bezier(.34,1.2,.64,1) !important; }
+  @keyframes squeezeOut {
+    0%   { transform: scale(1, 1) translateY(0) rotate(0); }
+    12%  { transform: scale(1.18, .52) translateY(16px) rotate(2deg); }
+    34%  { transform: scale(.82, 1.5) translateY(-8px) rotate(-4deg); }
+    52%  { transform: scale(.9, 1.28) translateY(1px) rotate(3deg); }
+    70%  { transform: scale(1.14, .86) translateY(-5px) rotate(-3deg); }
+    86%  { transform: scale(.95, 1.08) translateY(1px) rotate(1deg); }
+    100% { transform: scale(1, 1) translateY(0) rotate(0); }
   }
   .poop.idle { animation: poopIdle 2.6s ease-in-out infinite; }
   @keyframes poopIdle {
@@ -57,6 +61,30 @@
   /* 彩虹皮肤专属流光 */
   .poop.skin-rainbow { animation: rainbowHue 3s linear infinite; }
   @keyframes rainbowHue { from { filter: hue-rotate(0) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } to { filter: hue-rotate(360deg) drop-shadow(0 8px 6px rgba(90,58,30,.25)); } }
+  /* 拉丝：慢慢被拉出来的黏连感 */
+  .strain {
+    position: absolute; left: 50%; top: 88%; width: 0; height: 0;
+    transform: translateX(-50%); opacity: 0; pointer-events: none;
+    background: linear-gradient(180deg, #a9713c 0%, #7d4f24 70%, transparent 100%);
+    border-radius: 3px 3px 50% 50% / 2px 2px 100% 100%;
+  }
+  .strain.grow { animation: strainGrow .78s ease-out forwards; }
+  @keyframes strainGrow {
+    0%   { height: 0;  width: 26px; opacity: 0; }
+    18%  { height: 14px; width: 24px; opacity: .95; }
+    38%  { height: 40px; width: 15px; opacity: .95; }
+    56%  { height: 52px; width: 10px; opacity: .85; }
+    72%  { height: 22px; width: 7px;  opacity: 0; }
+    100% { height: 0;  width: 5px;  opacity: 0; }
+  }
+  /* 皮肤装饰：墨镜 / 超人 */
+  .poop-deco { position: absolute; pointer-events: none; line-height: 1; display: none; }
+  .poop-deco.shades { font-size: 40px; left: 50%; top: 26px; transform: translateX(-50%); }
+  .poop-deco.super  { font-size: 46px; right: -20px; top: -16px; }
+  .skin-emoji { position: relative; display: inline-block; }
+  .skin-deco { position: absolute; pointer-events: none; line-height: 1; }
+  .skin-deco.shades { font-size: 22px; left: 50%; top: 16px; transform: translateX(-50%); }
+  .skin-deco.super  { font-size: 24px; right: -12px; top: -10px; }
   .pop-num {
     position: fixed; pointer-events: none; z-index: 60;
     font-size: 26px; font-weight: 800; color: #b05252;
@@ -153,7 +181,8 @@
   </div>
 
   <div class="poop-wrap">
-    <span class="poop idle" id="poop" role="button" aria-label="点击拉屎">💩</span>
+    <span class="poop idle" id="poop" role="button" aria-label="点击拉屎">💩<span class="poop-deco" id="poopDeco"></span></span>
+    <span class="strain" id="strain"></span>
   </div>
 
   <div class="bar-wrap">
@@ -219,7 +248,9 @@
     { id:'ice',      name:'冰爽屎', emoji:'💩', filter:'hue-rotate(175deg) saturate(2) brightness(1.05)', need:60, spark:'❄️' },
     { id:'grape',    name:'紫晶屎', emoji:'💩', filter:'hue-rotate(260deg) saturate(2.4)', need:100, spark:'🔮' },
     { id:'lava',     name:'岩浆屎', emoji:'💩', filter:'hue-rotate(-28deg) saturate(4) brightness(1.08)', need:150, spark:'🔥' },
-    { id:'rainbow',  name:'彩虹屎', emoji:'💩', filter:'none', cls:'skin-rainbow', need:200, spark:'🌈' }
+    { id:'rainbow',  name:'彩虹屎', emoji:'💩', filter:'none', cls:'skin-rainbow', need:200, spark:'🌈' },
+    { id:'shades',   name:'墨镜屎', emoji:'💩', filter:'none', need:250, spark:'🕶️', deco:'🕶️', decoPos:'shades' },
+    { id:'super',    name:'超人屎', emoji:'💩', filter:'none', need:300, spark:'🦸', deco:'🦸', decoPos:'super' }
   ];
   var curSkin = 'classic';
   try { curSkin = localStorage.getItem('ls_skin') || 'classic'; } catch (e) {}
@@ -227,9 +258,20 @@
   function applySkin() {
     var s = skinById(curSkin);
     var el = $('poop');
-    el.textContent = s.emoji;
+    var deco = $('poopDeco');
+    if (el.firstChild && el.firstChild.nodeType === 3) el.firstChild.nodeValue = s.emoji;
+    else el.insertBefore(document.createTextNode(s.emoji), deco);
     el.style.filter = (s.filter && s.filter!=='none') ? s.filter : '';
     el.className = 'poop idle' + (s.cls ? ' ' + s.cls : '');
+    if (s.deco) {
+      deco.textContent = s.deco;
+      deco.className = 'poop-deco ' + (s.decoPos || '');
+      deco.style.display = 'block';
+    } else {
+      deco.textContent = '';
+      deco.className = 'poop-deco';
+      deco.style.display = 'none';
+    }
   }
   function unlocked(s) { return best >= s.need; }
 
@@ -298,6 +340,8 @@
     score++;
     var el = $('poop');
     el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+    var strain = $('strain');
+    strain.classList.remove('grow'); void strain.offsetWidth; strain.classList.add('grow');
     $('score').classList.add('bump');
     setTimeout(function () { $('score').classList.remove('bump'); }, 120);
     floatPop(e);
@@ -321,8 +365,9 @@
       var cls = 'skin-item' + (on ? ' on' : '') + (ok ? '' : ' locked');
       var filterCss = (s.filter && s.filter!=='none') ? ('filter:' + s.filter + ';') : '';
       var cond = ok ? (on ? '<div class="skin-on-tag">使用中</div>' : '') : ('🔒 最高分 ' + s.need);
+      var decoHtml = s.deco ? '<span class="skin-deco ' + (s.decoPos||'') + '">' + s.deco + '</span>' : '';
       return '<div class="' + cls + '" data-skin="' + s.id + '">' +
-        '<span class="skin-emoji" style="' + filterCss + '">' + s.emoji + '</span>' +
+        '<span class="skin-emoji" style="' + filterCss + '">' + s.emoji + decoHtml + '</span>' +
         '<div class="skin-name">' + s.name + '</div>' +
         '<div class="skin-cond">' + cond + '</div></div>';
     }).join('');
