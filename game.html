@@ -563,7 +563,7 @@
   </div>
 </div>
 
-<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js" onerror="window.__sdkFailed=true"></script>
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/latest/cloudbase.full.js" async onload="window.__sdkReady=true;window.dispatchEvent(new Event('cloudbase-ready'))" onerror="window.__sdkFailed=true"></script>
 <script src="config.js"></script>
 <script src="cloud.js"></script>
 <script src="game.js"></script>

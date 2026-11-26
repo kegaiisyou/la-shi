@@ -876,8 +876,9 @@
      12. 排行榜 UI
      ============================================================ */
   $('rank').onclick = function () {
+    bootCloud();
     $('rankOverlay').classList.add('show');
-    $('rankList').innerHTML = '<div class="rank-empty">加载中…</div>';
+    $('rankList').innerHTML = '<div class="rank-empty">' + (cloudOn ? '加载中…' : '云端功能加载中，请稍候') + '</div>';
     if (!cloudOn) {
       $('rankList').innerHTML = '<div class="rank-empty">未启用云端模式，暂无排行榜</div>';
       return;
@@ -913,15 +914,24 @@
   window.addEventListener('resize', function () { fitCanvas(); });
   window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 180); });
 
-  cloudOn = window.CloudAuth.init();
-  refreshUser();
-  var me = window.CloudAuth.me();
-  if (cloudOn && me) {
-    window.CloudAuth.pullBest(me.user).then(function (b) {
-      if (b > 0) { best = b; setLocalBest(best); render(); renderSkins(); }
-    });
-  } else {
-    best = localBest();
+  /* 云端 SDK 异步加载：首屏不等 CDN，SDK 就绪后补启用云账号 */
+  function bootCloud() {
+    if (cloudOn) return;
+    if (window.CloudAuth && window.CloudAuth.init()) {
+      cloudOn = true;
+      refreshUser();
+      var m = window.CloudAuth.me();
+      if (m) {
+        window.CloudAuth.pullBest(m.user).then(function (b) {
+          if (b > 0) { best = b; setLocalBest(best); render(); renderSkins(); }
+        });
+      }
+    }
   }
+  bootCloud();
+  if (!cloudOn) best = localBest();
   render(); renderSkins();
+  window.addEventListener('cloudbase-ready', bootCloud);
+  /* 事件可能在监听注册前触发，用标志兜底 */
+  if (window.__sdkReady || typeof window.cloudbase !== 'undefined') bootCloud();
 })();
