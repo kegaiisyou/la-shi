@@ -1,4 +1,4 @@
-(function () {
+﻿(function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
   var RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -31,8 +31,7 @@
              '" opacity=".12" transform="rotate(-16 ' + (105 - rx * 0.5) + ' ' + (cy - ry * 0.05) + ')" style="filter:blur(5px)"/>';
   }
   function tiers() {
-    return '<path class="p-core" d="M101 66 C97 110 90 146 90 182 L120 182 C120 146 113 110 109 66 Z"/>' +
-      '<g class="tier t4"><ellipse class="p-t4" cx="105" cy="164" rx="68" ry="38"/>' + tierShade(68, 38, 164) + '</g>' +
+    return '<g class="tier t4"><ellipse class="p-t4" cx="105" cy="164" rx="68" ry="38"/>' + tierShade(68, 38, 164) + '</g>' +
       '<g class="tier t3"><ellipse class="p-t3" cx="105" cy="126" rx="46" ry="30"/>' + tierShade(46, 30, 126) +
         face() + decoShades() + decoSuper() + '</g>' +
       '<g class="tier t2"><ellipse class="p-t2" cx="105" cy="98" rx="29" ry="20"/>' + tierShade(29, 20, 98) + '</g>' +
@@ -134,6 +133,9 @@
      3. 画布与粒子
      ============================================================ */
   var stage = $('stage'), poop = $('poop'), shadowEl = $('charShadow'), gameEl = $('game');
+  var lastFade = -1;
+  var RV = [0.0, 0.10, 0.30, 0.58];   /* t4 先出土，往上依次冒出 */
+  var RSPAN = [0.16, 0.26, 0.28, 0.30];
   var fx = $('fx'), bgfx = $('bgfx');
   var fx2d = fx.getContext('2d'), bg2d = bgfx.getContext('2d');
   var CW = 0, CH = 0, DPR = 1;
@@ -221,7 +223,9 @@
      4. 弹簧：角色的形变全部由物理驱动
      ============================================================ */
   var ch = { sx: 1, sy: 1, vx: 0, vy: 0, rot: 0, vr: 0 };
-  var shake = 0, tsec = 0, lastT = 0, pile = 0;
+  var shake = 0, tsec = 0, lastT = 0, pile = 0, drop = 0, lastPile = -1, lastM = -1;
+  /* 长按挤压：pq = 当前这一节的挤出进度(0~1)，按住涨、松手退；pile = 已经挤出来并落定的部分 */
+  var pressing = false, pq = 0, lastGrow = -1, gaugeEl = null, gaugeFill = null;
   var T = [], waveQ = [];
   var pageHidden = false, frameSkip = 0, tierSkip = 0;
   document.addEventListener('visibilitychange', function () {
@@ -270,7 +274,7 @@
     ch.vy = Math.max(-0.22, Math.min(0.22, ch.vy - 0.13 * P));                      /* 向上冲量：弹簧会把它顶过头再回摆 */
     ch.vx = 0.02 * P;
     ch.vr += D * 0.35 * P;
-    pile = Math.min(1, pile + 0.045 * P);   /* 越点越高，慢慢堆成一坨 */
+    pile = Math.min(1.02, pile + 0.34 * P); drop = Math.min(12, drop + 6 * P);  /* 一坨落下来：整体先沉一下再被顶起 */
 
     later(0,   function () { tierPush(T[0], 1.2 * P, 0.90, D * 0.4 * P, 0.6 * P); });
     later(40,  function () { tierPush(T[1], 3.0 * P, 0.94, D * 0.9 * P, -1.2 * P); });
@@ -289,6 +293,26 @@
     lastT = now; tsec += dt;
     var d = dt * 60;
 
+    /* 按住 → 一节一节往外挤；松手 → 原路退回，屎又被憋回去 */
+    var pressActive = false;
+    if (pressing) {
+      pq += dt * 1.15;
+      pressActive = true;
+      if (pq >= 1) { pq = 0; burst(null, true); }
+    } else if (pq > 0) {
+      pq -= dt * 0.92;
+      if (pq <= 0) { pq = 0; drop = Math.min(12, drop + 2); }
+      pressActive = true;
+    }
+    /* 显示量：已落定的堆 + 正在挤出的那一节 */
+    var grow = Math.min(1.2, pile + pq * 0.34);
+    var kGrow = Math.pow(grow, 0.5);
+    if (gaugeFill) {
+      gaugeFill.style.transform = 'scaleY(' + pq.toFixed(3) + ')';
+      var gOp = (pressing || pq > 0.015) ? 1 : 0;
+      if (gaugeEl.__op !== gOp) { gaugeEl.__op = gOp; gaugeEl.style.opacity = gOp; }
+    }
+
     /* 角色弹簧 */
     runWave();
     var kx = 0.30, ky = 0.26, dampX = Math.pow(0.84, d), dampY = Math.pow(0.86, d);
@@ -299,7 +323,7 @@
     /* 四段软体：每段自己弹，形变从堆底传到尖 */
     var idleSway = RM ? 0 : Math.sin(tsec * 1.35) * 1.1;
     /* 活跃度：有弹簧在动 / 有待触发的波 / 有堆叠 -> 每帧写；否则隔帧写（静止摆动 30fps 足够） */
-    var activeTier = waveQ.length > 0 || pile > 0.005 ||
+    var activeTier = pressActive || waveQ.length > 0 || Math.abs(pile - lastPile) > 0.001 || drop > 0.5 ||
       Math.abs(ch.sx - 1) > .004 || Math.abs(ch.sy - 1) > .004 || Math.abs(ch.rot) > .004 ||
       Math.abs(ch.vx) > .004 || Math.abs(ch.vy) > .004;
     if (!activeTier) {
@@ -324,23 +348,47 @@
       if (tg.sq < 0.62) { tg.sq = 0.62; if (tg.vs < 0) tg.vs = 0; }
       if (tg.sq > 1.40) { tg.sq = 1.40; if (tg.vs > 0) tg.vs = 0; }
       if (!writeTier) continue;
-      var restUp = tg.rest * pile;
+      var restUp = tg.rest * pile * 0.25;
       var sway = tg.lx + idleSway * tg.amp * 0.75;
       var tsx = 1 + (1 - tg.sq) * 0.44;
+      /* 堆底两层随成长张开：一开始是细细一条探出来，堆满才撑成宽底盘 */
+      if (ti === 0) tsx *= 0.62 + kGrow * 0.20;
+      else if (ti === 1) tsx *= 0.78 + kGrow * 0.14;
+      /* 出生阈值：每段从自己的底部往上长出来，没轮到的段高度为 0 */
+      var rv = (grow - RV[ti]) / RSPAN[ti];
+      rv = rv < 0 ? 0 : (rv > 1 ? 1 : rv);
+      rv = rv * rv * (3 - 2 * rv);            /* 平滑起步，不会一条线突然弹出来 */
+      tsx *= 0.58 + rv * 0.42;
       if (tg.el) tg.el.setAttribute('transform',
         'translate(' + sway.toFixed(2) + ',' + (tg.oy - restUp).toFixed(2) + ')' +
-        ' translate(105,' + tg.origin + ') scale(' + tsx.toFixed(3) + ',' + tg.sq.toFixed(3) + ')' +
+        ' translate(105,' + tg.origin + ') scale(' + tsx.toFixed(3) + ',' + (tg.sq * rv).toFixed(3) + ')' +
         ' rotate(' + tg.rot.toFixed(2) + ') translate(-105,' + (-tg.origin) + ')');
+      if (tg.el && writeTier) tg.el.style.opacity = rv < 0.015 ? '0' : '1';
     }
 
-    var baseX = 1 + pile * 0.07, baseY = 1 + pile * 0.16;
+    var baseX = 1, baseY = 1;
+    lastPile = pile;
+    /* 憋的时候整坨被往下压一点点，松手弹回来 */
+    var pressSquash = 1 - Math.min(pq, 0.8) * 0.10;
+    var sink = 0 + drop;   /* 屁股坐在原地，长高全靠往上堆 */
+    /* 水线随成长下移：越堆越满，淹得越少 */
+    var m0 = 93, m1 = 99.5;
+    if (m0 !== lastM) {
+      lastM = m0;
+      poop.style.setProperty('--msk', m0.toFixed(1) + '%');
+      poop.style.setProperty('--mend', m1.toFixed(1) + '%');
+    }
     var bob = RM ? 0 : Math.sin(tsec * 1.55) * 2.4 + Math.sin(tsec * 0.83) * 1.2;
+    drop *= Math.pow(0.78, d); if (drop < 0.3) drop = 0;
     poop.style.transform =
-      'translateY(' + bob.toFixed(2) + 'px) rotate(' + ch.rot.toFixed(2) + 'deg) ' +
-      'scale(' + (ch.sx * baseX).toFixed(3) + ',' + (ch.sy * baseY).toFixed(3) + ')';
+      'translateY(' + (bob + sink).toFixed(2) + 'px) rotate(' + ch.rot.toFixed(2) + 'deg) ' +
+      'scale(' + (ch.sx * baseX).toFixed(3) + ',' + (ch.sy * baseY * pressSquash).toFixed(3) + ')';
+    var fadeIn = Math.min(1, 0.34 + grow * 2.9);
+    if (fadeIn !== lastFade) { lastFade = fadeIn; poop.style.opacity = fadeIn.toFixed(2); }
     shadowEl.style.transform = 'scale(' + (0.92 + (ch.sx * baseX - 1) * 0.5).toFixed(3) + ',' +
       (0.92 - (ch.sy * baseY - 1) * 0.3).toFixed(3) + ')';
-    shadowEl.style.opacity = Math.max(.35, 1 - Math.abs(ch.sx - 1) * .8);
+    shadowEl.style.opacity = Math.min(1, grow * 3.2) * Math.max(.35, 1 - Math.abs(ch.sx - 1) * .8);
+    shadowEl.style.width = (62 + Math.min(grow, 1.2) * 62).toFixed(0) + 'px';
 
     /* 震屏 */
     if (shake > 0.4) {
@@ -507,7 +555,7 @@
   var combo = 0, comboTimer = null, comboT = 0;
   var comboEl = $('combo'), comboNum = $('comboNum');
 
-  function doTap(ev) {
+  function burst(ev) {
     var skin = skinById(curSkin);
     var c = anchor();
     var r = stage.getBoundingClientRect();
@@ -537,8 +585,8 @@
 
     /* 嘴巴张开 + 眼睛放大 */
     poop.classList.add('charge');
-    clearTimeout(doTap._ct);
-    doTap._ct = setTimeout(function () { poop.classList.remove('charge'); }, 320);
+    clearTimeout(burst._ct);
+    burst._ct = setTimeout(function () { poop.classList.remove('charge'); }, 320);
 
     popNum('+1', skin, combo);
     sfxTap(combo);
@@ -588,19 +636,29 @@
     render();
   }
 
-  /* 用 pointerdown 保证「按下即有反馈」；键盘可达 */
-  poop.addEventListener('pointerdown', function (e) {
-    e.preventDefault();
-    if (!AC && !muted) audioReady();
-    doTap(e);
-  });
+  /* 按住蓄力：按住就一直挤，挤满一节「啪」地落下来；松手原路退回 */
+  gaugeEl = $('gauge'); gaugeFill = $('gaugeFill');
+  function pressOn(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    pressing = true;
+    var h = $('hint'); if (h) h.classList.add('gone');
+    if (!AC && !muted) { try { audioReady(); } catch (err) {} }
+  }
+  function pressOff() { pressing = false; }
+  poop.addEventListener('pointerdown', pressOn);
+  window.addEventListener('pointerup', pressOff);
+  window.addEventListener('pointercancel', pressOff);
+
   poop.addEventListener('keydown', function (e) {
-    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); doTap(null); }
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); pressOn(null); }
+  });
+  poop.addEventListener('keyup', function (e) {
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowDown') { e.preventDefault(); pressOff(); }
   });
   poop.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   $('reset').addEventListener('click', function () {
-    score = 0; lv = 1; combo = 0; pile = 0;
+    score = 0; lv = 1; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     render();
@@ -700,7 +758,7 @@
   }
   $('skin').onclick = function () { renderSkins(); $('skinOverlay').classList.add('show'); };
   $('skinClose').onclick = function () { $('skinOverlay').classList.remove('show'); };
-  $('skinOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
+  $('skinOverlay').addEventListener('click', function (e) { if (e.target === this) { this.classList.remove('show'); } });
 
   /* ============================================================
      11. 登录 UI
