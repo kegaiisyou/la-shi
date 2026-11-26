@@ -21,41 +21,36 @@
   try { curSkin = localStorage.getItem('ls_skin') || 'classic'; } catch (e) {}
   function skinById(id) { for (var i = 0; i < SKINS.length; i++) if (SKINS[i].id === id) return SKINS[i]; return SKINS[0]; }
 
-  /* ---- 角色形状（四层调色 + union 剪影里的光影 + 五官 + 装饰） ---- */
+  /* ---- 角色：四段软体（底层 / 中层带脸 / 上层 / 卷尖），各自独立形变 ---- */
+  function tierShade(rx, ry, cy) {
+    return /* 落在下一层上的接触阴影 */ '<ellipse class="p-dark" cx="105" cy="' + (cy + ry * 0.76) + '" rx="' + (rx * 0.7) + '" ry="' + (ry * 0.13) +
+             '" opacity=".16" style="filter:blur(5px)"/>' +
+           /* 本层顶部的受光边 */ '<ellipse class="p-light" cx="105" cy="' + (cy - ry * 0.54) + '" rx="' + (rx * 0.72) + '" ry="' + (ry * 0.17) +
+             '" opacity=".24" style="filter:blur(6px)"/>' +
+           /* 侧面高光 */ '<ellipse class="gloss" cx="' + (105 - rx * 0.5) + '" cy="' + (cy - ry * 0.05) + '" rx="' + (rx * 0.26) + '" ry="' + (ry * 0.24) +
+             '" opacity=".12" transform="rotate(-16 ' + (105 - rx * 0.5) + ' ' + (cy - ry * 0.05) + ')" style="filter:blur(5px)"/>';
+  }
   function tiers() {
-    return '<ellipse class="p-t4" cx="105" cy="166" rx="72" ry="36"/>' +
-           '<ellipse class="p-t3" cx="105" cy="128" rx="52" ry="31"/>' +
-           '<ellipse class="p-t2" cx="105" cy="95" rx="36" ry="25"/>' +
-           '<path class="p-t1" d="M97 86 C91 67 99 50 115 44 C128 39 138 49 131 59 C124 69 115 75 113 88 Z"/>';
-  }
-  function clipShape() {
-    return '<ellipse cx="105" cy="166" rx="72" ry="36"/>' +
-           '<ellipse cx="105" cy="128" rx="52" ry="31"/>' +
-           '<ellipse cx="105" cy="95" rx="36" ry="25"/>' +
-           '<path d="M97 86 C91 67 99 50 115 44 C128 39 138 49 131 59 C124 69 115 75 113 88 Z"/>';
-  }
-  function shadows() {
-    return /* 底面投影 */ '<ellipse class="p-dark" cx="105" cy="199" rx="73" ry="25" opacity=".45" style="filter:blur(7px)"/>' +
-           /* 层与层之间的接缝阴影 */ '<ellipse class="p-dark" cx="105" cy="148" rx="44" ry="10" opacity=".22" style="filter:blur(5px)"/>' +
-           '<ellipse class="p-dark" cx="105" cy="112" rx="30" ry="8" opacity=".18" style="filter:blur(4px)"/>' +
-           /* 每层顶部的受光边 */ '<ellipse class="p-light" cx="105" cy="122" rx="43" ry="7" opacity=".3" style="filter:blur(5px)"/>' +
-           '<ellipse class="p-light" cx="105" cy="90" rx="29" ry="6" opacity=".28" style="filter:blur(4px)"/>' +
-           '<ellipse class="p-light" cx="122" cy="52" rx="10" ry="6" opacity=".34" style="filter:blur(3px)"/>' +
-           /* 侧面高光 */ '<ellipse class="gloss" cx="72" cy="86" rx="20" ry="8" opacity=".2" transform="rotate(-20 72 86)" style="filter:blur(5px)"/>' +
-           '<ellipse class="gloss" cx="76" cy="120" rx="16" ry="7" opacity=".16" transform="rotate(-14 76 120)" style="filter:blur(5px)"/>' +
-           '<ellipse class="gloss" cx="80" cy="154" rx="18" ry="8" opacity=".13" transform="rotate(-10 80 154)" style="filter:blur(6px)"/>';
+    return '<path class="p-core" d="M101 66 C97 110 90 146 90 182 L120 182 C120 146 113 110 109 66 Z"/>' +
+      '<g class="tier t4"><ellipse class="p-t4" cx="105" cy="164" rx="68" ry="38"/>' + tierShade(68, 38, 164) + '</g>' +
+      '<g class="tier t3"><ellipse class="p-t3" cx="105" cy="126" rx="46" ry="30"/>' + tierShade(46, 30, 126) +
+        face() + decoShades() + decoSuper() + '</g>' +
+      '<g class="tier t2"><ellipse class="p-t2" cx="105" cy="98" rx="29" ry="20"/>' + tierShade(29, 20, 98) + '</g>' +
+      '<g class="tier t1"><path class="p-t1" d="M98 88 C92 70 100 54 114 49 C126 45 135 54 129 63 C123 72 114 77 112 89 Z"/>' +
+        '<ellipse class="p-light" cx="120" cy="56" rx="8" ry="5" opacity=".28" transform="rotate(14 120 56)" style="filter:blur(4px)"/>' +
+      '</g>';
   }
   function face() {
     return '<g class="face">' +
-      '<ellipse class="p-blush" cx="74" cy="137" rx="9.5" ry="5.5" opacity=".42"/>' +
-      '<ellipse class="p-blush" cx="136" cy="137" rx="9.5" ry="5.5" opacity=".42"/>' +
+      '<ellipse class="p-blush" cx="72" cy="136" rx="9" ry="5.2" opacity=".4"/>' +
+      '<ellipse class="p-blush" cx="138" cy="136" rx="9" ry="5.2" opacity=".4"/>' +
       '<g class="eyes">' +
-        '<g class="eye"><ellipse class="eye-w" cx="88" cy="120" rx="7.5" ry="9"/>' +
-          '<ellipse class="eye-p" cx="89.5" cy="121" rx="4.4" ry="5.4"/>' +
-          '<ellipse class="eye-g" cx="86.5" cy="117" rx="1.7" ry="1.7"/></g>' +
-        '<g class="eye"><ellipse class="eye-w" cx="122" cy="120" rx="7.5" ry="9"/>' +
-          '<ellipse class="eye-p" cx="123.5" cy="121" rx="4.4" ry="5.4"/>' +
-          '<ellipse class="eye-g" cx="120.5" cy="117" rx="1.7" ry="1.7"/></g>' +
+        '<g class="eye"><ellipse class="eye-w" cx="89" cy="120" rx="7" ry="8.6"/>' +
+          '<ellipse class="eye-p" cx="89.6" cy="121" rx="5" ry="6.1"/>' +
+          '<ellipse class="eye-g" cx="87" cy="117.5" rx="2" ry="2"/></g>' +
+        '<g class="eye"><ellipse class="eye-w" cx="121" cy="120" rx="7" ry="8.6"/>' +
+          '<ellipse class="eye-p" cx="120.4" cy="121" rx="5" ry="6.1"/>' +
+          '<ellipse class="eye-g" cx="118" cy="117.5" rx="2" ry="2"/></g>' +
       '</g>' +
       '<g class="mouth-smile"><path d="M97 141.5 Q105 150.5 113 141.5" fill="none" stroke="#2E1C0F" stroke-width="3.4" stroke-linecap="round"/></g>' +
       '<g class="mouth-open">' +
@@ -94,10 +89,8 @@
 
   function charMarkup() {
     return '<svg class="poop-svg" viewBox="0 0 210 210" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">' +
-      '<defs><clipPath id="poopClip">' + clipShape() + '</clipPath></defs>' +
       capeMarkup() +
-      '<g clip-path="url(#poopClip)">' + tiers() + shadows() + '</g>' +
-      face() + decoShades() + decoSuper() +
+      tiers() +
     '</svg>';
   }
   /* 色板：从 body 向 light / dark 混出四层，保证换皮肤时层次依旧成立 */
@@ -110,15 +103,13 @@
   }
   function varsStyle(s) {
     return '--body:' + s.body + ';--dark:' + s.dark + ';--light:' + s.light + ';--blush:' + s.blush +
-      ';--t1:' + mixHex(s.body, s.light, .62) + ';--t2:' + mixHex(s.body, s.light, .3) +
-      ';--t3:' + s.body + ';--t4:' + mixHex(s.body, s.dark, .26);
+      ';--t1:' + mixHex(s.body, s.light, .5) + ';--t2:' + mixHex(s.body, s.light, .22) +
+      ';--t3:' + s.body + ';--t4:' + mixHex(s.body, s.dark, .18) +
+      ';--core:' + mixHex(s.body, s.dark, .34);
   }
   function skinPreview(s) {
-    var inner = tiers() + shadows() + face();
-    if (s.deco === 'shades') inner += decoShades();
-    if (s.deco === 'super') inner += decoSuper();
-    return '<svg viewBox="0 0 210 210" class="' + (s.rainbow ? 'rainbow' : '') + '" ' +
-      'style="' + varsStyle(s) + '">' + inner + '</svg>';
+    return '<svg viewBox="0 0 210 210" class="skin-' + s.id + (s.rainbow ? ' rainbow' : '') + '" ' +
+      'style="' + varsStyle(s) + '">' + tiers() + '</svg>';
   }
 
   function applySkin(flash) {
@@ -230,18 +221,62 @@
      4. 弹簧：角色的形变全部由物理驱动
      ============================================================ */
   var ch = { sx: 1, sy: 1, vx: 0, vy: 0, rot: 0, vr: 0 };
-  var shake = 0, tsec = 0, lastT = 0;
-  var pageHidden = false, frameSkip = 0;
+  var shake = 0, tsec = 0, lastT = 0, pile = 0;
+  var T = [], waveQ = [];
+  var pageHidden = false, frameSkip = 0, tierSkip = 0;
   document.addEventListener('visibilitychange', function () {
     pageHidden = document.hidden;
     lastT = 0;
   });
 
-  function hit(power, dir) {
-    ch.sx = 1 + 0.26 * power;
-    ch.sy = 1 - 0.24 * power;
-    ch.vx = 0; ch.vy = 0;
-    ch.vr = (dir || 0) * 0.9 * power;
+  /* 四段软体骨架：越往上弹簧越软、迟滞越大 → 形变像波一样从堆底传到尖 */
+  var RIG = [
+    { sel: '.t4', origin: 202, rest: 0,  amp: 0.6, k: 0.36, dp: 0.84, sway: 0.10,  sl: 0.86, lim: 6 },
+    { sel: '.t3', origin: 156, rest: 6,  amp: 1.0, k: 0.28, dp: 0.87, sway: 0.08,  sl: 0.87, lim: 11 },
+    { sel: '.t2', origin: 118, rest: 12, amp: 1.4, k: 0.22, dp: 0.89, sway: 0.06,  sl: 0.88, lim: 15 },
+    { sel: '.t1', origin: 88,  rest: 18, amp: 1.8, k: 0.17, dp: 0.90, sway: 0.045, sl: 0.89, lim: 14 }
+  ];
+
+  function buildRig() {
+    T = RIG.map(function (r) {
+      return {
+        el: poop.querySelector('.tier' + r.sel), origin: r.origin, rest: r.rest,
+        amp: r.amp, k: r.k, dp: r.dp, kl: r.sway, sl: r.sl, lim: r.lim,
+        oy: 0, vo: 0, sq: 1, vs: 0, lx: 0, vl: 0, rot: 0, vr: 0
+      };
+    });
+  }
+
+  function later(ms, fn) { waveQ.push({ at: tsec + ms / 1000, fn: fn }); }
+  function runWave() {
+    for (var i = waveQ.length - 1; i >= 0; i--) {
+      if (tsec >= waveQ[i].at) { var f = waveQ[i].fn; waveQ.splice(i, 1); f(); }
+    }
+  }
+  /* 冲量式推动：只给速度，位移交给弹簧 → 自然带回弹和跟随（这才是 duang 的来源） */
+  function tierPush(t, up, sqz, sway, spin) {
+    if (!t || !t.el) return;
+    t.vo = Math.max(-6, Math.min(6, t.vo - up));       /* 连点时限速，避免冲量叠加把堆顶甩飞 */
+    t.sq = Math.max(0.60, Math.min(1.45, sqz));
+    t.lx = Math.max(-22, Math.min(22, t.lx + (sway || 0)));
+    t.rot = Math.max(-14, Math.min(14, t.rot + (spin || 0)));
+  }
+
+  /* 一次“挤”：先被压扁（充气变宽变矮）→ 弹簧顶起来纵向拉长 → 顶尖最后被拉长冒头 → 整坨回摆 */
+  function squeeze(power, dir) {
+    var P = power || 1, D = dir || 0;
+    ch.sy = Math.min(ch.sy, 0.88);          /* 瞬时压扁：被从下面顶了一下 */
+    ch.sx = Math.max(ch.sx, 1.10);          /* 同时变宽 */
+    ch.vy = Math.max(-0.22, Math.min(0.22, ch.vy - 0.13 * P));                      /* 向上冲量：弹簧会把它顶过头再回摆 */
+    ch.vx = 0.02 * P;
+    ch.vr += D * 0.35 * P;
+    pile = Math.min(1, pile + 0.045 * P);   /* 越点越高，慢慢堆成一坨 */
+
+    later(0,   function () { tierPush(T[0], 1.2 * P, 0.90, D * 0.4 * P, 0.6 * P); });
+    later(40,  function () { tierPush(T[1], 3.0 * P, 0.94, D * 0.9 * P, -1.2 * P); });
+    later(85,  function () { tierPush(T[2], 3.6 * P, 0.96, D * 1.4 * P, 2.6 * P); });
+    later(135, function () { tierPush(T[3], 4.2 * P, 1.18, D * 1.8 * P, 6.0 * P); });  /* 尖：被拉长冒出来 */
+    later(190, function () { tierPush(T[3], 1.6 * P, 1.08, 0, -2.0 * P); });           /* 再送一下，让拉长多撑一会儿 */
   }
   function pulse(a) {
     shake = Math.max(shake, a || 7);
@@ -255,17 +290,56 @@
     var d = dt * 60;
 
     /* 角色弹簧 */
-    var kx = 0.34, ky = 0.30, damp = Math.pow(0.72, d);
-    ch.vx += (1 - ch.sx) * kx * d; ch.vx *= damp; ch.sx += ch.vx * d;
-    ch.vy += (1 - ch.sy) * ky * d; ch.vy *= damp; ch.sy += ch.vy * d;
-    ch.vr += (0 - ch.rot) * 0.28 * d; ch.vr *= Math.pow(0.74, d); ch.rot += ch.vr * d;
+    runWave();
+    var kx = 0.30, ky = 0.26, dampX = Math.pow(0.84, d), dampY = Math.pow(0.86, d);
+    ch.vx += (1 - ch.sx) * kx * d; ch.vx *= dampX; ch.sx += ch.vx * d;
+    ch.vy += (1 - ch.sy) * ky * d; ch.vy *= dampY; ch.sy += ch.vy * d;
+    ch.vr += (0 - ch.rot) * 0.28 * d; ch.vr *= Math.pow(0.80, d); ch.rot += ch.vr * d;
 
-    var bob = RM ? 0 : Math.sin(tsec * 1.55) * 2.6 + Math.sin(tsec * 0.83) * 1.3;
+    /* 四段软体：每段自己弹，形变从堆底传到尖 */
+    var idleSway = RM ? 0 : Math.sin(tsec * 1.35) * 1.1;
+    /* 活跃度：有弹簧在动 / 有待触发的波 / 有堆叠 -> 每帧写；否则隔帧写（静止摆动 30fps 足够） */
+    var activeTier = waveQ.length > 0 || pile > 0.005 ||
+      Math.abs(ch.sx - 1) > .004 || Math.abs(ch.sy - 1) > .004 || Math.abs(ch.rot) > .004 ||
+      Math.abs(ch.vx) > .004 || Math.abs(ch.vy) > .004;
+    if (!activeTier) {
+      for (var ai = 0; ai < T.length; ai++) {
+        var ag = T[ai];
+        if (Math.abs(ag.oy) > .08 || Math.abs(ag.vo) > .02 || Math.abs(ag.sq - 1) > .008 ||
+            Math.abs(ag.vs) > .01 || Math.abs(ag.lx) > .08 || Math.abs(ag.vl) > .02 ||
+            Math.abs(ag.rot) > .08 || Math.abs(ag.vr) > .02) { activeTier = true; break; }
+      }
+    }
+    tierSkip = (tierSkip + 1) % 2;
+    var writeTier = activeTier || tierSkip === 0;
+    for (var ti = 0; ti < T.length; ti++) {
+      var tg = T[ti];
+      tg.vo += (0 - tg.oy) * tg.k * d; tg.vo *= Math.pow(tg.dp, d); tg.oy += tg.vo * d;
+      tg.vs += (1 - tg.sq) * 0.46 * d; tg.vs *= Math.pow(0.76, d); tg.sq += tg.vs * d;
+      tg.vl += (0 - tg.lx) * tg.kl * d; tg.vl *= Math.pow(tg.sl, d); tg.lx += tg.vl * d;
+      tg.vr += (0 - tg.rot) * 0.22 * d; tg.vr *= Math.pow(0.80, d); tg.rot += tg.vr * d;
+      /* 位移硬上限：保证任何情况下四段都咬在一起，不会散架 */
+      if (tg.oy < -tg.lim) { tg.oy = -tg.lim; if (tg.vo < 0) tg.vo = 0; }
+      if (tg.oy > 10) { tg.oy = 10; if (tg.vo > 0) tg.vo = 0; }
+      if (tg.sq < 0.62) { tg.sq = 0.62; if (tg.vs < 0) tg.vs = 0; }
+      if (tg.sq > 1.40) { tg.sq = 1.40; if (tg.vs > 0) tg.vs = 0; }
+      if (!writeTier) continue;
+      var restUp = tg.rest * pile;
+      var sway = tg.lx + idleSway * tg.amp * 0.75;
+      var tsx = 1 + (1 - tg.sq) * 0.44;
+      if (tg.el) tg.el.setAttribute('transform',
+        'translate(' + sway.toFixed(2) + ',' + (tg.oy - restUp).toFixed(2) + ')' +
+        ' translate(105,' + tg.origin + ') scale(' + tsx.toFixed(3) + ',' + tg.sq.toFixed(3) + ')' +
+        ' rotate(' + tg.rot.toFixed(2) + ') translate(-105,' + (-tg.origin) + ')');
+    }
+
+    var baseX = 1 + pile * 0.07, baseY = 1 + pile * 0.16;
+    var bob = RM ? 0 : Math.sin(tsec * 1.55) * 2.4 + Math.sin(tsec * 0.83) * 1.2;
     poop.style.transform =
       'translateY(' + bob.toFixed(2) + 'px) rotate(' + ch.rot.toFixed(2) + 'deg) ' +
-      'scale(' + ch.sx.toFixed(3) + ',' + ch.sy.toFixed(3) + ')';
-    shadowEl.style.transform = 'scale(' + (0.92 + (ch.sx - 1) * 0.55).toFixed(3) + ',' +
-      (0.92 - (ch.sy - 1) * 0.4).toFixed(3) + ')';
+      'scale(' + (ch.sx * baseX).toFixed(3) + ',' + (ch.sy * baseY).toFixed(3) + ')';
+    shadowEl.style.transform = 'scale(' + (0.92 + (ch.sx * baseX - 1) * 0.5).toFixed(3) + ',' +
+      (0.92 - (ch.sy * baseY - 1) * 0.3).toFixed(3) + ')';
     shadowEl.style.opacity = Math.max(.35, 1 - Math.abs(ch.sx - 1) * .8);
 
     /* 震屏 */
@@ -454,7 +528,7 @@
 
 
     var hintEl = $('hint'); if (hintEl) hintEl.classList.add('gone');
-    hit(1, dir);
+    squeeze(1, dir);
     pulse(combo >= 10 ? 9 : 0);
 
     drops(c.x, c.y + 34, skin, 1);
@@ -526,7 +600,8 @@
   poop.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   $('reset').addEventListener('click', function () {
-    score = 0; lv = 1; combo = 0;
+    score = 0; lv = 1; combo = 0; pile = 0;
+    T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     render();
     toast('已重新开始');
@@ -692,6 +767,7 @@
      13. 启动
      ============================================================ */
   $('poop').innerHTML = charMarkup();
+  buildRig();
   applySkin(false);
   fitCanvas();
   requestAnimationFrame(tick);

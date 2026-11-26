@@ -136,11 +136,14 @@
   .p-body  { fill: var(--body); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
   .p-dark  { fill: var(--dark); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
   .p-light { fill: var(--light); transition: fill .45s cubic-bezier(.3,.8,.3,1); }
-  .p-t1, .p-t2, .p-t3, .p-t4 { transition: fill .45s cubic-bezier(.3,.8,.3,1); }
+  .p-t1, .p-t2, .p-t3, .p-t4, .p-core { transition: fill .45s cubic-bezier(.3,.8,.3,1); }
   .p-t1 { fill: var(--t1); }
   .p-t2 { fill: var(--t2); }
   .p-t3 { fill: var(--t3); }
   .p-t4 { fill: var(--t4); }
+  .p-core { fill: var(--core); }
+  /* 四段软体：每段独立形变，缩放在自己底部 */
+  .tier { will-change: transform; }
   .p-blush { fill: var(--blush); }
   .p-white { fill: #fff; }
   .p-ink   { fill: #2E1C0F; }
