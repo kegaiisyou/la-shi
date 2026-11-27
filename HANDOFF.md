@@ -326,3 +326,11 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 
 **验证**：`_verify_toilet.js`（临时脚本，验证后清理）真机 8 项全绿：初始态、5 坨入池、刷新保留 5 坨+落地堆、满池拦截、冲水后 bag=5/toilet=0、存档写入、再刷新保留、旧档 `ls_best=37` 迁移；0 pageerror + 0 consoleError。后续改为「有 1~5 坨即可冲」，`_verify_partial.js` 真机 3/3 通过（3 坨未满时按钮可用且显示 +3、冲水后 bag=3、刷新保留）。`_verify_online.js` 线上 iframe 验证新 UI 生效（0 pageerror）。**已部署上线**（2026-11-27）。
 - **CLI 部署坑**：本机 PATH 没有 `tcb`，`deploy.ps1` 直接跑会报「无法识别 tcb」。可用 npm exec 调起 `@cloudbase/cli@3.9.5` 逐个执行 `hosting deploy`（需先把 Node 目录加入 PATH）；CLI 登录态有效，沙箱拦 `reg.exe` 不影响上传结果。
+
+**排行榜"数值没更新"排查结论（2026-11-27）**：
+1. 未登录：`scheduleSave()` / `syncBagToCloud()` 都要求 `CloudAuth.me()`，未登录玩家只存本地，不上榜。榜单面板现在会显示「未登录，你的背包不会上榜」提示。
+2. 延迟：原来冲水走 1.5s 防抖，刚冲完就开榜单会看到旧值。已改为冲水直接调 `syncBagToCloud()`（正在同步时排一次补同步）。
+3. 拉取时机：榜单只在点击时读一次。现在点击时若已登录且 `bag>0`，会补同步并 1.2s 后重拉一次。
+4. 口径：榜单 `best` 已是累计入袋数；老账号云端旧值只有被本地 `bag` 超过才会覆盖。
+5. 同步失败：`pushBest` 返回 false（换设备导致 `anon_uid` 与当前匿名身份不符，RLS 静默过滤；或网络错误）现在会 toast 提示，不再无声失败。
+验证：`_verify_rank_sync.js` mock 真机 3/3 通过（冲水即时 push、榜单显示新值、未登录提示）。

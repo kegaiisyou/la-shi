@@ -772,7 +772,7 @@
     toilet = 0;
     var oldBag = bag;
     bag += n; best = bag;
-    persist(); scheduleSave();
+    persist(); syncBagToCloud();          /* 冲水立刻同步，不等 1.5s 防抖 */
     ring(c.x, c.y + 26, 22, 'rgba(150,225,255,.95)', 8, 520, 1.1);
     confetti(c.x, c.y + 10, 22);
     sfxFlush(); pulse(11);
@@ -849,19 +849,33 @@
   }
 
   /* 云端 best 触发器限制单次增量 ≤50：老档迁移时分段追平，避免一次写大数被拒 */
+  var syncing = false, syncFailTip = 0;
   function syncBagToCloud() {
     var me = window.CloudAuth.me();
     if (!cloudOn || !me) return;
+    if (syncing) { scheduleSave(); return; }   /* 同步中又冲水：排一次补同步 */
+    syncing = true;
     var guard = 0;
+    function finish() { syncing = false; }
+    function fail() {
+      var t = performance.now();
+      if (t - syncFailTip > 3000) {
+        syncFailTip = t;
+        toast('云端同步失败，请确认已登录且用原设备');
+      }
+      finish();
+    }
     function step() {
-      if (guard++ > 200) return;
+      if (guard++ > 200) { finish(); return; }
       window.CloudAuth.pullBest(me.user).then(function (b) {
-        if (b >= bag) return;
+        if (b >= bag) { finish(); return; }
         var next = Math.min(bag, b + 50);
         window.CloudAuth.pushBest(me.user, next).then(function (done) {
-          if (done && next < bag) setTimeout(step, 60);
+          if (!done) { fail(); return; }
+          if (next < bag) setTimeout(step, 60);
+          else finish();
         });
-      });
+      }).catch(fail);
     }
     step();
   }
@@ -971,14 +985,27 @@
       $('rankList').innerHTML = '<div class="rank-empty">未启用云端模式，暂无排行榜</div>';
       return;
     }
-    window.CloudAuth.ranking(20).then(function (rows) {
+    var me = window.CloudAuth.me();
+    function renderRows(rows) {
       if (!rows.length) { $('rankList').innerHTML = '<div class="rank-empty">暂无云端记录 · 登录后点击即可上榜</div>'; return; }
-      var me = window.CloudAuth.me();
-      $('rankList').innerHTML = rows.map(function (r, i) {
+      var tip = me ? '' : '<div class="rank-tip">未登录，你的背包不会上榜（点右上角登录）</div>';
+      $('rankList').innerHTML = tip + rows.map(function (r, i) {
         var cls = 'rank-row' + (i === 0 ? ' top1' : '') + ((me && r.user === me.user) ? ' me' : '');
         return '<div class="' + cls + '"><span class="no">' + (i + 1) + '</span>' +
           '<span class="nm">' + r.nickname + '</span><span class="sc">💩 ' + r.best + '</span></div>';
       }).join('');
+    }
+    window.CloudAuth.ranking(20).then(function (rows) {
+      renderRows(rows);
+      /* 打开榜单时补一次同步：冲水后哪怕没等防抖，也能马上看到自己 */
+      if (me && bag > 0) {
+        syncBagToCloud();
+        setTimeout(function () {
+          window.CloudAuth.ranking(20).then(function (rows2) {
+            if (JSON.stringify(rows2) !== JSON.stringify(rows)) renderRows(rows2);
+          });
+        }, 1200);
+      }
     });
   };
   $('rankClose').onclick = function () { $('rankOverlay').classList.remove('show'); };
