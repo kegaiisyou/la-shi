@@ -335,3 +335,21 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 5. 同步失败：`pushBest` 返回 false（换设备导致 `anon_uid` 与当前匿名身份不符，RLS 静默过滤；或网络错误）现在会 toast 提示，不再无声失败。
 验证：`_verify_rank_sync.js` mock 真机 3/3 通过（冲水即时 push、榜单显示新值、未登录提示）。
 - **测试号清理（2026-11-27）**：线上曾残留未绑定 `anon_uid` 的历史测试号 `id=8 / 带薪拉屎 / best=0`，RLS 导致它永远无法更新、却占着榜单。已用 `tcb db execute -e la-shi-d9g35yrnaef3ef5b9 --sql "DELETE FROM public.ls_users WHERE id = 8 AND anon_uid IS NULL"` 精确删除（AffectedRows=1）；现库仅剩 `id=7 / 拉屎大王`（已绑定，best=10）。CLI 用默认角色即可，`--role postgres` 会被拼成不存在的角色名而报错。
+
+
+---
+
+## 12. 容器阶级化（2026-11-27）
+
+**需求**：后期容器容量涨到几千几万，格子显示和「冲马桶」文案都要跟着升级。
+
+**实现**：
+- `config.js` 新增 `VESSELS`（20 档），每档含 `name / short / cap / need / verb / label / icon / fx`。`need` 是累计入袋数里程碑，`cap` 是当前容量，约 4 倍递增：5 → 20 → 100 → … → 25 万亿。`game.js` 用 `vesselFor(bag)` 查当前档，`vesselIndex()` 取档位做特效分级。
+- 存档结构不变：`ls_save_v1 = {v:1,bag,toilet}`，`toilet` 继续存当前容器坨数；`bag` 上限放宽到 1e15，`loadSave()` 会 clamp 到当前容量。
+- UI：`capacity <= 8` 显示格子（`#toiletSlots`），否则隐藏格子改显示 `#toiletBar` 进度条 + `#pileCount` 待入袋数字。`fmt()` 做紧凑格式化（`123456 → 12.3万`、`2e8 → 2亿`）；大数字也用于 `#score` / `#barPct` / `#best`。
+- 按钮/文案：`#vesselName` 显示 `icon + name`；按钮 `${icon} ${label} +${fmt(n)}`；满容器 banner/toast 与冲水 banner 都取 `label`；升级时额外播 `容器升级 · ${name}`。
+- 特效：`sfxFlush(tier)` 频率随档位降低；ring 半径/颜色、confetti 数量按 `fx`（ripple/wave/surge/cosmic）分级。
+- 视觉上限：`MAX_LANDED = 8`，大容量只画 8 坨代表；`restorePile()` 也只恢复 `visualCap()` 个。**坑**：`spawnLandedPoop(..., instant=true)` 必须直接把 transform 落到 `x1/y1`，否则没有 flyer 驱动会全部叠在角色脚下（已修）。
+- 数据库：`public.ls_users.best` 从 `integer` 改为 `bigint`（`ALTER TABLE public.ls_users ALTER COLUMN best TYPE bigint`），否则后期大数 pushBest 会数值越界。触发器 ≤50 与 RLS 不受影响。
+
+**验证**：`_verify_vessels.js` 真机 5/5 通过（默认蹲坑格子模式、bag=137 自动游泳池数字模式、bag=123456/toilet=2345 大数紧凑显示+8 坨、大数冲水后 12.6 万、bag=95→100 升级换名提示）；0 pageerror + 0 consoleError。截图确认手机端按钮/进度条无溢出。

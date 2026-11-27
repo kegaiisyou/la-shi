@@ -318,7 +318,7 @@
     min-height: 19px; font-size: 11.5px; color: var(--ink2);
     text-align: center; margin: 9px 0 10px; letter-spacing: .3px;
   }
-  /* ---------- 便池：5 格容量，冲水后 5 坨才进背包 ---------- */
+  /* ---------- 容器：小容量画格子，大容量只显示数字 + 进度条 ---------- */
   .toilet-row {
     width: 100%; max-width: 340px; margin: 10px auto 0;
     display: flex; align-items: center; gap: 10px;
@@ -342,8 +342,31 @@
     background: linear-gradient(180deg, #F4C57C, #C87B2C);
     box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 7px rgba(210,130,45,.45);
   }
+  .toilet-bar {
+    display: none; height: 11px; border-radius: 7px; overflow: hidden;
+    background: linear-gradient(180deg, #EAD7B8, #DCC19A);
+    box-shadow: inset 0 1px 2px rgba(120,80,40,.18), inset 0 -1px 0 rgba(255,255,255,.5);
+    font-variant-numeric: tabular-nums;
+  }
+  .toilet-bar.show { display: block; }
+  .toilet-bar i {
+    display: block; height: 100%; width: 0%;
+    border-radius: 7px;
+    background: linear-gradient(180deg, #F4C57C, #C87B2C);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 7px rgba(210,130,45,.45);
+    transition: width .34s cubic-bezier(.25,.9,.25,1);
+  }
+  .pile-count {
+    display: none; position: absolute; left: 50%; bottom: 8%;
+    transform: translateX(-50%); z-index: 6; pointer-events: none;
+    background: rgba(255,250,238,.88); border-radius: 20px; padding: 3px 11px;
+    font-size: 12px; font-weight: 800; color: #7A4A22;
+    box-shadow: 0 2px 8px rgba(120,80,40,.18); font-variant-numeric: tabular-nums;
+  }
+  .pile-count.show { display: block; }
   button.flush {
     padding: 9px 12px; font-size: 12px; border-radius: 12px; white-space: nowrap;
+    max-width: 190px; overflow: hidden; text-overflow: ellipsis;
     background: linear-gradient(180deg, #E9F6FB 0%, #CFE8F4 100%);
     color: #2B6E94; box-shadow: 0 3px 0 rgba(46,120,160,.25), 0 6px 12px rgba(46,120,160,.15);
   }
@@ -587,6 +610,7 @@
   <div class="stage" id="stage">
     <div class="pool" aria-hidden="true"></div>
     <div class="poop-pile" id="poopPile" aria-hidden="true"></div>
+    <div class="pile-count" id="pileCount" aria-hidden="true"></div>
     <div class="char-wrap">
       <div class="hint" id="hint"><span class="hand">👇</span>按住不放，往上挤</div>
       <div class="char-shadow" id="charShadow"></div>
@@ -606,10 +630,11 @@
     </div>
     <div class="toilet-row" id="toiletRow">
       <div class="toilet-info">
-        <div class="toilet-meta"><span>🚽 便池</span><b id="toiletPct">0 / 5</b></div>
+        <div class="toilet-meta"><span id="vesselName">🚽 蹲坑</span><b id="toiletPct">0 / 5</b></div>
         <div class="toilet-slots" id="toiletSlots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+        <div class="toilet-bar" id="toiletBar" aria-hidden="true"><i id="toiletBarFill"></i></div>
       </div>
-      <button id="flush" class="flush" disabled>🚽 冲马桶</button>
+      <button id="flush" class="flush" disabled>🚽 冲蹲坑 0/5</button>
     </div>
     <div class="msg" id="msg">🎒 背包：<span id="best">0</span> 坨 · 云端同步</div>
     <div class="btns">
