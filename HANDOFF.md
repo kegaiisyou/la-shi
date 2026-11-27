@@ -438,3 +438,16 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 3. **倒计时**：冲水和升级容器原本都写 `lastAutoAt = Date.now()`，把进度清零。新增 `holdSince`（容器满 / 助手关闭时记下暂停起点，落档到 v3）；暂停期间冻结 `lastAutoAt`，恢复时 `lastAutoAt += now - holdSince` 顺延。冲水 / 扩容 / 重新开启都走恢复逻辑，不再重置。
 
 **验证**：`_verify_fixes.mjs` 真机 15/15 通过——后台 30 分钟不弹卡、回前台弹卡且显示 30 分/+5 坨、满容器记录 `holdSince` 并落档、冲水后 `holdSince=0` 且 `lastAutoAt` 顺延、重置仍全量清零、0 pageerror / 0 consoleError。
+
+## 19. 榜单双向对齐 + 离线卡片极简化（2026-11-27）
+
+**用户反馈**：①排行榜又和实际数据不同步；②离线弹窗标题改「欢迎回来」，只显示离线时长和收益。
+
+**榜单不同步根因**：
+- 触发器 `ls_users_guard()` 有「单次增量 ≤50」限制，而游戏容器早已到几百/几万容量，一次正常冲水入袋 >50 就被拒；旧 `game.js` 虽做了 50 一段的分批追平，但 `guard > 200` 最多追 1 万，且**云端高于本地时完全不处理**——本地重置成 0 后打开榜单，云端旧值会一直显示。
+- 修复：`tcb db execute` 重建 `public.ls_users_guard()`，删掉增量上限，只保留 `anon_uid immutable` 和 `best >= 0`；`cloud.js` 新增 `setBest(username, value)`（可升可降，update 后回读确认，RLS 不放行返回 false），`pushBest` 成为它的别名，`resetBest = setBest(...,0)`；`game.js` 的 `syncBagToCloud()` 改成一次 `setBest(me.user, bag)`，冲水和打开榜单都触发，且打开榜单时 `me` 存在即同步（不再要求 `bag>0`）。
+- 注意：RLS 仍是 `anon_uid = auth.uid()`，跨设备登录后只能看不能改，失败会提示「请用原设备登录」。
+
+**卡片极简**：标题「欢迎回来」，去掉「实际补算 / 离线上限 / 上限提示文案」三块，只留「离开时长」和「+N 坨（这次离线收获）」；升级按钮 `display:none` 默认隐藏，**只有 `res.clamped` 撞上限时才露出**，兼顾之前要的升级动机。
+
+**验证**：`_verify_sync_card.mjs` 真机 13/13 通过——标题/收益/时长/单行信息/无多余说明、未撞上限隐藏升级、撞上限显示升级、云端高于本地拉回 12、本地为 0 清零云端旧值、本地高于云端推到 25、0 pageerror / 0 consoleError。截图确认卡片清爽。

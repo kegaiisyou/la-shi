@@ -138,34 +138,26 @@
     }).catch(function () { return 0; });
   }
 
-  function pushBest(username, best) {
-    if (!cloud || !username) return Promise.resolve(false);
-    return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id,best').eq('username', username));
-    }).then(function (res) {
-      var rec = res.data && res.data[0];
-      if (!rec) return false;
-      if (best <= (rec.best || 0)) return false;
-      return send(db.from(CFG.TABLE).update({ best: best }).eq('id', rec.id)).then(function () { return true; });
-    }).catch(function () { return false; });
-  }
-
-  /* 重置账号分数：排行榜按 best 排序，清成 0 即从榜上消失 */
-  function resetBest(username) {
+  /* 把云端分数对齐到本地值（可升可降）；RLS 只允许改自己那行 */
+  function setBest(username, value) {
+    var v = Math.max(0, Math.floor(Number(value) || 0));
     if (!cloud || !username) return Promise.resolve(false);
     return ensureAuth().then(function () {
       return send(db.from(CFG.TABLE).select('id').eq('username', username));
     }).then(function (res) {
       var rec = res.data && res.data[0];
       if (!rec) return false;
-      return send(db.from(CFG.TABLE).update({ best: 0 }).eq('id', rec.id)).then(function () {
-        /* RLS 不放行时 update 返回 0 行且不报错，必须回读确认 */
+      return send(db.from(CFG.TABLE).update({ best: v }).eq('id', rec.id)).then(function () {
         return send(db.from(CFG.TABLE).select('best').eq('id', rec.id)).then(function (check) {
-          return !(check.data && check.data[0] && check.data[0].best > 0);
+          return !!(check.data && check.data[0] && Number(check.data[0].best) === v);
         });
       });
     }).catch(function () { return false; });
   }
+  function pushBest(username, best) { return setBest(username, best); }
+
+  /* 重置账号分数：排行榜按 best 排序，清成 0 即从榜上消失 */
+  function resetBest(username) { return setBest(username, 0); }
 
   function ranking(limit) {
     limit = limit || 10;
@@ -182,6 +174,6 @@
   window.CloudAuth = {
     init: init, isCloud: function () { return cloud; },
     register: register, login: login, logout: logout, me: me,
-    pullBest: pullBest, pushBest: pushBest, resetBest: resetBest, ranking: ranking
+    pullBest: pullBest, pushBest: pushBest, setBest: setBest, resetBest: resetBest, ranking: ranking
   };
 })();

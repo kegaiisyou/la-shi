@@ -269,33 +269,15 @@
   }
   function renderOfflineCard() {
     var res = lastOfflineRes; if (!res) return;
-    var oldCap = res.capMs || autoOfflineMs;
-    $('offMade').innerHTML = '+' + res.made + ' 坨<small>' +
-      (res.made ? '趁你不在挤的' : (res.full ? '容器满了，小屎崽停工' : '还没到一坨的时间')) + '</small>';
+    $('offMade').innerHTML = '+' + res.made + ' 坨<small>这次离线收获</small>';
     $('offAway').textContent = fmtAway(res.awayMs);
-    $('offCounted').textContent = fmtAway(res.countedMs) + (res.clamped ? '（截断）' : '');
-    $('offCap').textContent = fmtCap(autoOfflineMs);
-    $('offCapRow').classList.toggle('hit', !!res.clamped);
-    var note;
-    if (res.clamped) {
-      note = '⚠️ 撞到' + fmtCap(oldCap) + '上限：离开' + fmtAway(res.awayMs) +
-        '，多出来的' + fmtAway(res.awayMs - oldCap) + '没算。升级后这段也能补回来。';
-    } else if (res.clipped) {
-      note = '✅ 时间全算到了，不过容器先装满了。冲水后小屎崽继续开工。';
-    } else if (res.full) {
-      note = '🚽 容器是满的，这段时间小屎崽没地方放，先冲水再来吧。';
-    } else {
-      note = '✅ 没撞上限，离开的这段时间全算进去了。';
-    }
-    $('offNote').textContent = note;
-    $('offNote').classList.toggle('hit', !!res.clamped);
-    var next = nextOfflineTier(), btn = $('offUpgrade');
-    if (next) {
-      btn.disabled = false;
+    /* 撞上限时才露出升级入口，平时卡片只留时长和收益 */
+    var btn = $('offUpgrade'), next = nextOfflineTier();
+    if (res.clamped && next) {
+      btn.style.display = '';
       btn.textContent = '⬆️ 离线升级 → ' + fmtCap(next);
     } else {
-      btn.disabled = true;
-      btn.textContent = '✅ 离线已满级';
+      btn.style.display = 'none';
     }
   }
   function maybeShowOfflineCard(res) {
@@ -1114,36 +1096,27 @@
     if ($('mode')) $('mode').textContent = cloudOn ? '云端' : '本地';
   }
 
-  /* 云端 best 触发器限制单次增量 ≤50：老档迁移时分段追平，避免一次写大数被拒 */
+  /* 云端 best 与本地背包对齐：云端比本地高也要拉回来，否则榜单会一直显示旧值 */
   var syncing = false, syncFailTip = 0;
   function syncBagToCloud() {
     var me = window.CloudAuth.me();
     if (!cloudOn || !me) return;
     if (syncing) { scheduleSave(); return; }   /* 同步中又冲水：排一次补同步 */
     syncing = true;
-    var guard = 0;
-    function finish() { syncing = false; }
     function fail() {
+      syncing = false;
       var t = performance.now();
       if (t - syncFailTip > 3000) {
         syncFailTip = t;
         toast('云端同步失败，请确认已登录且用原设备');
       }
-      finish();
     }
-    function step() {
-      if (guard++ > 200) { finish(); return; }
-      window.CloudAuth.pullBest(me.user).then(function (b) {
-        if (b >= bag) { finish(); return; }
-        var next = Math.min(bag, b + 50);
-        window.CloudAuth.pushBest(me.user, next).then(function (done) {
-          if (!done) { fail(); return; }
-          if (next < bag) setTimeout(step, 60);
-          else finish();
-        });
+    window.CloudAuth.pullBest(me.user).then(function (b) {
+      if (Number(b) === bag) { syncing = false; return; }
+      window.CloudAuth.setBest(me.user, bag).then(function (ok) {
+        if (ok) syncing = false; else fail();
       }).catch(fail);
-    }
-    step();
+    }).catch(fail);
   }
   function scheduleSave() {
     var me = window.CloudAuth.me();
@@ -1264,7 +1237,7 @@
     window.CloudAuth.ranking(20).then(function (rows) {
       renderRows(rows);
       /* 打开榜单时补一次同步：冲水后哪怕没等防抖，也能马上看到自己 */
-      if (me && bag > 0) {
+      if (me) {
         syncBagToCloud();
         setTimeout(function () {
           window.CloudAuth.ranking(20).then(function (rows2) {
