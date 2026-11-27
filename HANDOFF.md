@@ -384,3 +384,19 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 **实现**：`config.js` 的 `VESSELS` 整体重排；`game.js` 兜底默认档与 `game.html` 初始文案同步改为夜壶；`fx` 重新启用 `cosmic`（银河/星海/宇宙的 ring 改回紫色）。手动免费升级机制不变，`vesselLevel` 存档兼容。
 
 **验证**：`_verify_order.js` 真机 7/7 通过（名单顺序、默认夜壶不自动升级、点3次到洗手池、海洋档 13.42 亿大数、旧档 15 坨迁移到水箱、满级宇宙 1.37 万亿且按钮禁用）；0 pageerror + 0 consoleError。
+
+## 15. 小屎崽助手：自动产出 + 离线补算（2026-11-27）
+
+**需求**：自动装置/动物持续挤屎；容器满停产；玩家不在也继续挤，离线先限 10 分钟、后续可升级；先看视觉效果。
+
+**方案选择**：复用现有四段软体屎 SVG 做「小屎崽」放在主角左侧，零新增美术。进度环用 CSS `conic-gradient(--p)`，挤压/吐屎用 class 动画，状态文案显示倒计时或「容器满了 / 已休息」。底部新增 `#autoToggle`。
+
+**实现要点**：
+- `config.js` 新增 `AUTO = { ENABLED, INTERVAL_MS:120000, OFFLINE_CAP_MS:600000 }`。
+- `game.js` 存档升 `v:3`，加 `autoOn / lastAutoAt / autoOfflineMs`；老档缺字段时走配置默认值。`autoOfflineMs` 单独落档，将来做离线时长升级只需改它（不用迁移结构）。
+- **墙钟结算**：`settleAuto()` 用 `Date.now() - lastAutoAt`，按 `elapsed % interval` 保留零散进度；超过 `autoOfflineMs` 就截断。满容器/关闭时把 `lastAutoAt` 直接推到 now，不攒进度。
+- `setInterval(autoTick, 1000)` 独立于被暂停的 rAF；`visibilitychange` 回前台也主动结算一次。启动时在 `restorePile()` 之前结算，屎堆直接显示最终状态。冲水/升级/重置都会重置 `lastAutoAt`。
+- `applySkin()` 必须给 `#helperBody` 同时写 `innerHTML` 和 `varsStyle(s)`，否则 SVG 缺 CSS 变量会渲染成纯黑剪影（已踩坑）。
+- `window.LS_AUTO_DEBUG` 是原型验证钩子（get/simulate/setInterval/setOfflineCap），正式版可删。
+
+**验证**：`_verify_auto.mjs` 真机 21/21 通过——默认开启、SVG 渲染、v3 存档、在线产出、满容器截断与停产、助手满状态、冲水恢复、离线 30 分钟只算 10 分钟（带上限提示）、刷新持久化、开关双向、0 pageerror / 0 consoleError。桌面 480×820 与手机 390×844 截图确认助手不遮挡主角和按钮。

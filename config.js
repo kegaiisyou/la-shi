@@ -10,6 +10,17 @@ window.LS_CONFIG = {
   ENV: 'la-shi-d9g35yrnaef3ef5b9',   // ← 你的 CloudBase 环境 ID
   TABLE: 'ls_users',
   SAVE_DEBOUNCE_MS: 1500,
+  /* ===== 小屎崽助手（自动产出）=====
+     ENABLED       : 首次进入时默认开/关，玩家可在底部按钮随时切换
+     INTERVAL_MS   : 在线每多少毫秒挤出一坨（原型先给 2 分钟，方便看效果）
+     OFFLINE_CAP_MS: 玩家离开时最多补算多久的产出（当前 10 分钟，后续可升级）
+     满容器会立即停产且不攒进度；冲水/升级容器后重新计时。
+  */
+  AUTO: {
+    ENABLED: true,
+    INTERVAL_MS: 120000,
+    OFFLINE_CAP_MS: 600000
+  },
   /* ===== 容器阶级：按真实容量从小到大排序 =====
      参考：夜壶约2.5L / 马桶水箱3~6L(老式12L) / 浴缸230~320L /
            家用蓄水池2~50m³ / 标准泳池约1890~2500吨

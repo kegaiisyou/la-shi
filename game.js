@@ -166,6 +166,75 @@
     for (var i = 0; i < shown; i++) spawnLandedPoop(skin, 0, 0, true);
   }
 
+  /* ============================================================
+     小屎崽助手：墙钟结算 + 离线补算 + 视觉状态
+     ============================================================ */
+  var helperEl = $('helper'), helperRing = $('helperRing'), helperTime = $('helperTime'), helperBubble = $('helperBubble');
+  var helperPopTimer = null;
+  function fmtDur(ms) {
+    var s = Math.max(0, Math.ceil(ms / 1000)), m = Math.floor(s / 60);
+    s = s % 60;
+    return (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+  }
+  function helperPop(text) {
+    if (!helperEl) return;
+    helperBubble.textContent = text || '💩';
+    helperEl.classList.remove('pop'); void helperEl.offsetWidth; helperEl.classList.add('pop');
+    helperEl.classList.remove('squeeze'); void helperEl.offsetWidth; helperEl.classList.add('squeeze');
+    clearTimeout(helperPopTimer);
+    helperPopTimer = setTimeout(function () { helperEl.classList.remove('pop', 'squeeze'); }, 900);
+  }
+  function updateHelper() {
+    if (!helperEl) return;
+    var full = toilet >= currentVessel().cap;
+    helperEl.classList.toggle('off', !autoOn);
+    helperEl.classList.toggle('full', autoOn && full);
+    if (!autoOn) { helperTime.textContent = '已休息'; helperRing.style.setProperty('--p', '0deg'); return; }
+    if (full) { helperTime.textContent = '容器满了'; helperRing.style.setProperty('--p', '360deg'); return; }
+    var elapsed = Math.max(0, Date.now() - lastAutoAt);
+    var p = ((elapsed % autoIntervalMs) / autoIntervalMs) * 360;
+    helperRing.style.setProperty('--p', p.toFixed(1) + 'deg');
+    helperTime.textContent = '下坨 ' + fmtDur(autoIntervalMs - (elapsed % autoIntervalMs));
+  }
+  /* made = 本次补出的坨数；clamped = 离线时长撞到上限 */
+  function settleAuto() {
+    var now = Date.now(), elapsed = now - lastAutoAt;
+    if (!isFinite(elapsed) || elapsed < 0) { elapsed = 0; lastAutoAt = now; }  /* 用户改过系统时间 */
+    var clamped = elapsed > autoOfflineMs;
+    if (clamped) elapsed = autoOfflineMs;
+    var room = Math.max(0, currentVessel().cap - toilet);
+    if (!autoOn || room === 0) { lastAutoAt = now; return { made: 0, clamped: false, full: true }; }
+    var n = Math.floor(elapsed / autoIntervalMs), made = Math.min(n, room);
+    if (made > 0) {
+      toilet += made;
+      /* 被容量截断：不保留零散进度，冲水/扩容后重新计时 */
+      lastAutoAt = made < n ? now : now - (elapsed % autoIntervalMs);
+      persist();
+    } else if (clamped) {
+      lastAutoAt = now - (elapsed % autoIntervalMs);
+    }
+    return { made: made, clamped: clamped, full: false };
+  }
+  function autoMsg(res) {
+    return '小屎崽趁你不在挤了 ' + res.made + ' 坨' +
+      (res.clamped ? '（离线最多 ' + Math.round(autoOfflineMs / 60000) + ' 分钟）' : '');
+  }
+  function applyAuto(res) {
+    if (!res.made) { updateHelper(); return; }
+    helperPop(res.made > 1 ? '💪' : '💩');
+    if (res.made > 1) {
+      clearLanded(); restorePile();
+      toast(autoMsg(res));
+      banner('小屎崽代班 · +' + res.made);
+      var rc = anchor(); ring(rc.x, rc.y + 10, 20, 'rgba(255,205,120,.95)', 6, 420, 1);
+    } else {
+      setTimeout(function () { spawnLandedPoop(skinById(curSkin), 0, 0, false); render(); }, 300);
+      toast('小屎崽帮你挤了 1 坨');
+    }
+    render();
+  }
+  function autoTick() { applyAuto(settleAuto()); }
+
   /* 一坨飞走后，原地回到初始种子状态，等待玩家重新捏下一坨 */
   function resetToSeed() {
     pile = 0; pq = 0; drop = 0; lastPile = -1; lastGrow = -1;
@@ -181,6 +250,11 @@
     var svg = $('poop').querySelector('.poop-svg');
     svg.setAttribute('style', varsStyle(s));
     svg.setAttribute('class', 'poop-svg skin-' + s.id + (s.rainbow ? ' rainbow' : ''));
+    var helperBody = $('helperBody');
+    if (helperBody) {
+      helperBody.innerHTML = landedMarkup(s);
+      helperBody.setAttribute('style', varsStyle(s));   /* 配色变量要跟着皮肤走，否则 SVG 会变纯黑 */
+    }
     if (flash) {
       var c = anchor();
       ring(c.x, c.y, 26, 'rgba(255,255,255,.95)', 5);
@@ -196,6 +270,14 @@
   if (!VESSELS.length) VESSELS = [{ name:'夜壶', short:'夜壶', cap:5, need:0, verb:'倒', label:'倒夜壶', icon:'🏺', fx:'ripple' }];
   var bag = 0, toilet = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   var vesselLevel = 0;   /* 手动升级的容器档位，默认蹲坑 */
+
+  /* ---- 小屎崽助手：墙钟计时，不依赖 rAF（后台标签页 rAF 会暂停） ---- */
+  var AUTO = (window.LS_CONFIG && window.LS_CONFIG.AUTO) || {};
+  function cfgNum(v, d, lo, hi) { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); }
+  var autoIntervalMs = cfgNum(AUTO.INTERVAL_MS, 120000, 1000, 86400000);
+  var autoOfflineMs  = cfgNum(AUTO.OFFLINE_CAP_MS, 600000, 0, 604800000);
+  var autoOn = AUTO.ENABLED !== false;
+  var lastAutoAt = Date.now();          /* 上次结算的墙钟时刻 */
   function need(n) { return 10 * n * n; }
   function levelFrom(n) { var l = 1; while (n >= need(l)) l++; return l; }
   function currentVessel() {
@@ -226,6 +308,9 @@
           vesselLevel = 0;
           while (vesselLevel + 1 < VESSELS.length && currentVessel().cap < toilet) vesselLevel++;
         }
+        if (typeof o.autoOn === 'boolean') autoOn = o.autoOn;
+        if (typeof o.lastAutoAt === 'number' && isFinite(o.lastAutoAt) && o.lastAutoAt > 0) lastAutoAt = o.lastAutoAt;
+        if (typeof o.autoOfflineMs === 'number') autoOfflineMs = cfgNum(o.autoOfflineMs, autoOfflineMs, 0, 604800000);
       }
     } catch (e) {}
     var oldBest = localBest();                 /* 旧版单局最高分迁移为背包起始值，不丢老进度 */
@@ -236,7 +321,8 @@
     lv = levelFrom(bag);
   }
   function persist() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, bag: bag, toilet: toilet, vesselLevel: vesselLevel })); } catch (e) {}
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, bag: bag, toilet: toilet, vesselLevel: vesselLevel,
+      autoOn: autoOn, lastAutoAt: lastAutoAt, autoOfflineMs: autoOfflineMs })); } catch (e) {}
     setLocalBest(bag);
   }
 
@@ -342,6 +428,7 @@
   document.addEventListener('visibilitychange', function () {
     pageHidden = document.hidden;
     lastT = 0;
+    if (!document.hidden) autoTick();   /* 回到前台：按墙钟补算，不依赖被暂停的 rAF */
   });
 
   /* 四段软体骨架：越往上弹簧越软、迟滞越大 → 形变像波一样从堆底传到尖 */
@@ -789,6 +876,7 @@
 
   function doReset() {
     toilet = 0; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
+    lastAutoAt = Date.now();
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     clearLanded();
@@ -804,6 +892,7 @@
     if (pileEl) pileEl.classList.add('flushing');
     setTimeout(function () { clearLanded(); if (pileEl) pileEl.classList.remove('flushing'); }, 460);
     toilet = 0;
+    lastAutoAt = Date.now();      /* 满容器时冻结的计时，冲完重新走 */
     var oldBag = bag;
     bag += n; best = bag;
     persist(); syncBagToCloud();          /* 冲水立刻同步，不等 1.5s 防抖 */
@@ -841,6 +930,7 @@
   function upgradeVessel() {
     if (vesselLevel >= VESSELS.length - 1) { toast('已经是最大容器了'); return; }
     vesselLevel++;
+    lastAutoAt = Date.now();      /* 扩容后小屎崽重新开工 */
     persist(); render();
     var v = currentVessel(), c = anchor();
     banner('容器升级 · ' + v.name);
@@ -890,6 +980,9 @@
       ub.disabled = false;
       ub.textContent = '⬆️ 升级 → ' + VESSELS[vesselLevel + 1].name;
     }
+    var at = $('autoToggle');
+    if (at) at.textContent = autoOn ? '🤖 小屎崽：开' : '🤖 小屎崽：关';
+    updateHelper();
   }
 
   /* ============================================================
@@ -1158,7 +1251,19 @@
   applySkin(false);
   fitCanvas();
   loadSave();
+  var offlineRes = settleAuto();        /* 离线补算：先算再摆屎堆，视觉直接是最终状态 */
   restorePile();
+  if (offlineRes.made > 0) {
+    helperPop('💪');
+    setTimeout(function () { toast(autoMsg(offlineRes)); banner('小屎崽代班 · +' + offlineRes.made); }, 480);
+  }
+  $('autoToggle').addEventListener('click', function () {
+    autoOn = !autoOn;
+    lastAutoAt = Date.now();
+    persist(); render();
+    toast(autoOn ? '小屎崽上岗：每 ' + Math.round(autoIntervalMs / 60000) + ' 分钟挤一坨' : '小屎崽下班了');
+  });
+  setInterval(autoTick, 1000);          /* 墙钟轮询，后台标签页被节流也不影响补算 */
   requestAnimationFrame(tick);
   window.addEventListener('resize', function () { fitCanvas(); });
   window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 180); });
@@ -1178,6 +1283,19 @@
       }
     }
   }
+  /* 原型验证钩子：控制台/自动化可模拟离线与调快节奏，正式版可删 */
+  window.LS_AUTO_DEBUG = {
+    get: function () {
+      return { autoOn: autoOn, lastAutoAt: lastAutoAt, toilet: toilet, bag: bag,
+               interval: autoIntervalMs, offlineCap: autoOfflineMs, vesselCap: currentVessel().cap };
+    },
+    simulate: function (ms) {
+      lastAutoAt -= Math.max(0, Number(ms) || 0);
+      var res = settleAuto(); applyAuto(res); return res;
+    },
+    setInterval: function (ms) { autoIntervalMs = cfgNum(ms, 120000, 1000, 86400000); render(); },
+    setOfflineCap: function (ms) { autoOfflineMs = cfgNum(ms, 600000, 0, 604800000); persist(); render(); }
+  };
   bootCloud();
   best = bag;
   render(); renderSkins();
