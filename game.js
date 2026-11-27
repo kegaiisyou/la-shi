@@ -193,7 +193,7 @@
      ============================================================ */
   var SAVE_KEY = 'ls_save_v1';
   var VESSELS = (window.LS_CONFIG && window.LS_CONFIG.VESSELS) || [];
-  if (!VESSELS.length) VESSELS = [{ name:'蹲坑', short:'蹲坑', cap:5, need:0, verb:'冲', label:'冲蹲坑', icon:'🚽', fx:'ripple' }];
+  if (!VESSELS.length) VESSELS = [{ name:'夜壶', short:'夜壶', cap:5, need:0, verb:'倒', label:'倒夜壶', icon:'🏺', fx:'ripple' }];
   var bag = 0, toilet = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   var vesselLevel = 0;   /* 手动升级的容器档位，默认蹲坑 */
   function need(n) { return 10 * n * n; }
@@ -807,7 +807,8 @@
     var oldBag = bag;
     bag += n; best = bag;
     persist(); syncBagToCloud();          /* 冲水立刻同步，不等 1.5s 防抖 */
-    var rc = oldVessel.fx === 'abyss' ? 'rgba(110,170,255,.95)' :
+    var rc = oldVessel.fx === 'cosmic' ? 'rgba(195,155,255,.95)' :
+             oldVessel.fx === 'abyss' ? 'rgba(110,170,255,.95)' :
              oldVessel.fx === 'surge' ? 'rgba(120,210,255,.95)' : 'rgba(150,225,255,.95)';
     ring(c.x, c.y + 26, 22 + vi * 2, rc, 8, 520 + vi * 30, 1.1);
     confetti(c.x, c.y + 10, Math.min(22 + vi * 4, 80));
