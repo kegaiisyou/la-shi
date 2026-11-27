@@ -219,7 +219,7 @@ $env:GIT_TERMINAL_PROMPT = '0'
 ## 7. 迭代历史（git log）
 
 ```
-（未提交）feat: 便池存档 + 冲马桶入袋（ls_save_v1，满 5 冲水，best 改累计入袋口径）
+a763c56 feat: 便池存档 + 冲马桶入袋（ls_save_v1，满 5 冲水，best 改累计入袋口径）
 187f8a0 feat: 打赏入口 💖「支持作者」+ 三种内嵌广告位（config.js SUPPORT / ADS 驱动）
 2b38e77 feat: 捏出即飞走的屎堆 + 抛物线弹射 + 惊奇表情 + 长按防选中
 60585c3 feat: 长按蓄力憋屎玩法 + 压力仪表 + 修 hint 恢复 bug
