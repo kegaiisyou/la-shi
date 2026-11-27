@@ -427,3 +427,14 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - `doReset()` 定义在皮肤段之前，但 `comboBest / renderSkins / lastOfflineRes` 都是 `var` 或函数声明，靠提升可访问。
 
 **验证**：`_verify_reset.mjs` 真机 21/21 通过——短文案、确认弹窗与取消不清档、确认后背包/容器/皮肤/连击/自动设置归零、夜壶与 0 分、云端 `resetBest` 收到正确用户名、登录态保留、黄金皮肤重新上锁、离线升级与收下按钮短文案、0 pageerror / 0 consoleError。
+
+## 18. 修复离线弹窗 / 排行榜未清 / 冲水重置倒计时（2026-11-27）
+
+**用户反馈**：①离线回来没弹结算卡；②重置账号后排行榜数据还在；③清空容器按钮把自动倒计时重置了。
+
+**根因与修复**：
+1. **弹窗**：`setInterval(autoTick,1000)` 在后台标签页仍被节流执行（约每分钟一次），每次都按墙钟结算并把 `lastAutoAt` 推进，导致回前台时 `awayMs` 只剩几十秒，达不到 60 秒门槛。改为 `autoTick()` 在 `document.hidden` 时直接返回，回到前台的 `visibilitychange` 再一次性结算 + 弹卡。真机用 `Object.defineProperty(document,'hidden',...)` 模拟后台 30 分钟验证通过。
+2. **排行榜**：`resetBest()` 的 `update` 在 RLS 不放行时返回 0 行且不报错，旧实现直接 `return true`，玩家看到「已清零」但榜上还在。改为 update 后回读 `best` 确认；未登录提示「登录后才清排行榜」，跨设备提示「请用原设备登录清榜」。另用 `tcb db execute` 把两个测试账号（id 7 拉屎大王 / id 9 带薪拉屎）的 `best` 直接清零，线上榜单现在都是 0。触发器 `ls_users_guard()` 只限制单次**增加** ≤50，减到 0 不会被拦；RLS UPDATE 的 USING/WITH CHECK 都是 `anon_uid = auth.uid()`，所以跨设备无法改，这是既有设计。
+3. **倒计时**：冲水和升级容器原本都写 `lastAutoAt = Date.now()`，把进度清零。新增 `holdSince`（容器满 / 助手关闭时记下暂停起点，落档到 v3）；暂停期间冻结 `lastAutoAt`，恢复时 `lastAutoAt += now - holdSince` 顺延。冲水 / 扩容 / 重新开启都走恢复逻辑，不再重置。
+
+**验证**：`_verify_fixes.mjs` 真机 15/15 通过——后台 30 分钟不弹卡、回前台弹卡且显示 30 分/+5 坨、满容器记录 `holdSince` 并落档、冲水后 `holdSince=0` 且 `lastAutoAt` 顺延、重置仍全量清零、0 pageerror / 0 consoleError。

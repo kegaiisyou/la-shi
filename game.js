@@ -205,8 +205,13 @@
     if (clamped) elapsed = autoOfflineMs;
     var room = Math.max(0, currentVessel().cap - toilet);
     if (!autoOn || room === 0) {
-      lastAutoAt = now;
+      if (!holdSince) { holdSince = now; persist(); }   /* 暂停期间冻结进度，不清零 */
       return { made: 0, clamped: false, full: true, clipped: false, awayMs: awayMs, countedMs: 0, capMs: autoOfflineMs };
+    }
+    if (holdSince) {                       /* 恢复时把暂停时长补回基线，倒计时接着走 */
+      lastAutoAt += Math.max(0, now - holdSince);
+      holdSince = 0;
+      persist();
     }
     var n = Math.floor(elapsed / autoIntervalMs), made = Math.min(n, room);
     if (made > 0) {
@@ -239,7 +244,10 @@
     }
     render();
   }
-  function autoTick(quiet) { var res = settleAuto(); applyAuto(res, quiet); return res; }
+  function autoTick(quiet) {
+    if (document.hidden) return null;   /* 后台不逐次结算，否则节流轮询会把离开时间吃掉、弹不出卡 */
+    var res = settleAuto(); applyAuto(res, quiet); return res;
+  }
 
   /* ---- 离线归来结算卡：时长 / 产量 / 是否撞上限 / 可见的升级入口 ---- */
   var lastOfflineRes = null;
@@ -353,6 +361,7 @@
     .map(function (v) { return cfgNum(v, 600000, 0, 604800000); }).sort(function (a, b) { return a - b; });
   var autoOn = AUTO.ENABLED !== false;
   var lastAutoAt = Date.now();          /* 上次结算的墙钟时刻 */
+  var holdSince = 0;                    /* 容器满/助手关闭而暂停的起点，冲水后顺延而不是重置倒计时 */
   function need(n) { return 10 * n * n; }
   function levelFrom(n) { var l = 1; while (n >= need(l)) l++; return l; }
   function currentVessel() {
@@ -386,6 +395,7 @@
         if (typeof o.autoOn === 'boolean') autoOn = o.autoOn;
         if (typeof o.lastAutoAt === 'number' && isFinite(o.lastAutoAt) && o.lastAutoAt > 0) lastAutoAt = o.lastAutoAt;
         if (typeof o.autoOfflineMs === 'number') autoOfflineMs = cfgNum(o.autoOfflineMs, autoOfflineMs, 0, 604800000);
+        holdSince = (typeof o.holdSince === 'number' && isFinite(o.holdSince) && o.holdSince > 0) ? o.holdSince : 0;
       }
     } catch (e) {}
     var oldBest = localBest();                 /* 旧版单局最高分迁移为背包起始值，不丢老进度 */
@@ -397,7 +407,7 @@
   }
   function persist() {
     try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 3, bag: bag, toilet: toilet, vesselLevel: vesselLevel,
-      autoOn: autoOn, lastAutoAt: lastAutoAt, autoOfflineMs: autoOfflineMs })); } catch (e) {}
+      autoOn: autoOn, lastAutoAt: lastAutoAt, autoOfflineMs: autoOfflineMs, holdSince: holdSince })); } catch (e) {}
     setLocalBest(bag);
   }
 
@@ -957,6 +967,7 @@
     autoOfflineMs = cfgNum(AUTO.OFFLINE_CAP_MS, 600000, 0, 604800000);
     autoIntervalMs = cfgNum(AUTO.INTERVAL_MS, 120000, 1000, 86400000);
     lastAutoAt = Date.now();
+    holdSince = 0;
     lastOfflineRes = null;
     pile = 0; drop = 0; pq = 0; pressing = false;
     ['ls_save_v1', 'ls_best', 'ls_combo_best', 'ls_skin'].forEach(function (k) {
@@ -970,10 +981,10 @@
     var me = window.CloudAuth.me();
     if (me && window.CloudAuth.resetBest) {
       window.CloudAuth.resetBest(me.user).then(function (ok) {
-        toast(ok ? '已重置 · 排行榜清零' : '已重置 · 云端清零失败');
+        toast(ok ? '已重置 · 排行榜清零' : '已重置 · 请用原设备登录清榜');
       });
     } else {
-      toast('已重置');
+      toast('已重置本地 · 登录后可清排行榜');
     }
   }
   /* 冲容器：里面的 1~cap 坨一次性转入背包，并升容器 / 升等级 / 同步云端 */
@@ -985,7 +996,7 @@
     if (pileEl) pileEl.classList.add('flushing');
     setTimeout(function () { clearLanded(); if (pileEl) pileEl.classList.remove('flushing'); }, 460);
     toilet = 0;
-    lastAutoAt = Date.now();      /* 满容器时冻结的计时，冲完重新走 */
+    settleAuto();                 /* 满容器暂停过就顺延倒计时，不重新计时 */
     var oldBag = bag;
     bag += n; best = bag;
     persist(); syncBagToCloud();          /* 冲水立刻同步，不等 1.5s 防抖 */
@@ -1023,7 +1034,7 @@
   function upgradeVessel() {
     if (vesselLevel >= VESSELS.length - 1) { toast('已经是最大容器了'); return; }
     vesselLevel++;
-    lastAutoAt = Date.now();      /* 扩容后小屎崽重新开工 */
+    settleAuto();                 /* 扩容后沿用原进度 */
     persist(); render();
     var v = currentVessel(), c = anchor();
     banner('容器升级 · ' + v.name);
@@ -1354,8 +1365,8 @@
   maybeShowOfflineCard(offlineRes);   /* 离线归来：结算卡统一交代时长/产量/上限 */
   $('autoToggle').addEventListener('click', function () {
     autoOn = !autoOn;
-    lastAutoAt = Date.now();
-    persist(); render();
+    if (autoOn) settleAuto(); else { holdSince = Date.now(); persist(); }
+    render();
     toast(autoOn ? '自动产出已开' : '自动产出已关');
   });
   setInterval(autoTick, 1000);          /* 墙钟轮询，后台标签页被节流也不影响补算 */
@@ -1381,7 +1392,7 @@
   /* 原型验证钩子：控制台/自动化可模拟离线与调快节奏，正式版可删 */
   window.LS_AUTO_DEBUG = {
     get: function () {
-      return { autoOn: autoOn, lastAutoAt: lastAutoAt, toilet: toilet, bag: bag,
+      return { autoOn: autoOn, lastAutoAt: lastAutoAt, holdSince: holdSince, toilet: toilet, bag: bag,
                interval: autoIntervalMs, offlineCap: autoOfflineMs, vesselCap: currentVessel().cap };
     },
     simulate: function (ms) {
@@ -1390,6 +1401,7 @@
     },
     setInterval: function (ms) { autoIntervalMs = cfgNum(ms, 120000, 1000, 86400000); render(); },
     setOfflineCap: function (ms) { autoOfflineMs = cfgNum(ms, 600000, 0, 604800000); persist(); render(); },
+    rewind: function (ms) { lastAutoAt -= Math.max(0, Number(ms) || 0); return lastAutoAt; },
     offlineCard: function (ms) {
       lastAutoAt -= Math.max(0, Number(ms) || 0);
       var res = settleAuto(); maybeShowOfflineCard(res); return res;
