@@ -284,10 +284,10 @@
     var next = nextOfflineTier(), btn = $('offUpgrade');
     if (next) {
       btn.disabled = false;
-      btn.textContent = '⬆️ 升级离线时长 → ' + fmtCap(next) + '（测试期免费）';
+      btn.textContent = '⬆️ 离线升级 → ' + fmtCap(next);
     } else {
       btn.disabled = true;
-      btn.textContent = '✅ 离线上限已达最高档 ' + fmtCap(autoOfflineMs);
+      btn.textContent = '✅ 离线已满级';
     }
   }
   function maybeShowOfflineCard(res) {
@@ -949,14 +949,32 @@
   });
   poop.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
+  /* 重置账号：背包 / 容器 / 皮肤解锁 / 自动助手 / 云端排行榜全部归零 */
   function doReset() {
-    toilet = 0; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
+    bag = 0; toilet = 0; lv = 1; best = 0; vesselLevel = 0;
+    combo = 0; comboBest = 0; curSkin = 'classic';
+    autoOn = AUTO.ENABLED !== false;
+    autoOfflineMs = cfgNum(AUTO.OFFLINE_CAP_MS, 600000, 0, 604800000);
+    autoIntervalMs = cfgNum(AUTO.INTERVAL_MS, 120000, 1000, 86400000);
     lastAutoAt = Date.now();
+    lastOfflineRes = null;
+    pile = 0; drop = 0; pq = 0; pressing = false;
+    ['ls_save_v1', 'ls_best', 'ls_combo_best', 'ls_skin'].forEach(function (k) {
+      try { localStorage.removeItem(k); } catch (e) {}
+    });
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     clearLanded();
-    persist(); render();
-    toast(currentVessel().name + '已清空，背包不受影响');
+    applySkin(false);
+    persist(); render(); renderSkins();
+    var me = window.CloudAuth.me();
+    if (me && window.CloudAuth.resetBest) {
+      window.CloudAuth.resetBest(me.user).then(function (ok) {
+        toast(ok ? '已重置 · 排行榜清零' : '已重置 · 云端清零失败');
+      });
+    } else {
+      toast('已重置');
+    }
   }
   /* 冲容器：里面的 1~cap 坨一次性转入背包，并升容器 / 升等级 / 同步云端 */
   function flushToilet() {
@@ -1015,9 +1033,13 @@
   }
   $('upgrade').addEventListener('click', upgradeVessel);
   $('reset').addEventListener('click', function () {
-    if (adValid(ADS.REVIVE)) { adAfterClose = doReset; showAd(ADS.REVIVE, '继续游戏'); }
-    else doReset();
+    function ask() { $('resetOverlay').classList.add('show'); }
+    if (adValid(ADS.REVIVE)) { adAfterClose = ask; showAd(ADS.REVIVE, '继续游戏'); }
+    else ask();
   });
+  $('resetConfirm').onclick = function () { $('resetOverlay').classList.remove('show'); doReset(); };
+  $('resetCancel').onclick = function () { $('resetOverlay').classList.remove('show'); };
+  $('resetOverlay').addEventListener('click', function (e) { if (e.target === this) $('resetCancel').click(); });
 
   /* ============================================================
      8. 渲染 UI
@@ -1053,10 +1075,10 @@
       ub.disabled = true; ub.textContent = '⬆️ 已满级';
     } else {
       ub.disabled = false;
-      ub.textContent = '⬆️ 升级 → ' + VESSELS[vesselLevel + 1].name;
+      ub.textContent = '⬆️ 升级：' + VESSELS[vesselLevel + 1].name;
     }
     var at = $('autoToggle');
-    if (at) at.textContent = autoOn ? '🤖 小屎崽：开' : '🤖 小屎崽：关';
+    if (at) at.textContent = autoOn ? '🤖 自动：开' : '🤖 自动：关';
     updateHelper();
   }
 
@@ -1334,7 +1356,7 @@
     autoOn = !autoOn;
     lastAutoAt = Date.now();
     persist(); render();
-    toast(autoOn ? '小屎崽上岗：每 ' + Math.round(autoIntervalMs / 60000) + ' 分钟挤一坨' : '小屎崽下班了');
+    toast(autoOn ? '自动产出已开' : '自动产出已关');
   });
   setInterval(autoTick, 1000);          /* 墙钟轮询，后台标签页被节流也不影响补算 */
   requestAnimationFrame(tick);

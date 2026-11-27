@@ -150,6 +150,18 @@
     }).catch(function () { return false; });
   }
 
+  /* 重置账号分数：排行榜按 best 排序，清成 0 即从榜上消失 */
+  function resetBest(username) {
+    if (!cloud || !username) return Promise.resolve(false);
+    return ensureAuth().then(function () {
+      return send(db.from(CFG.TABLE).select('id').eq('username', username));
+    }).then(function (res) {
+      var rec = res.data && res.data[0];
+      if (!rec) return false;
+      return send(db.from(CFG.TABLE).update({ best: 0 }).eq('id', rec.id)).then(function () { return true; });
+    }).catch(function () { return false; });
+  }
+
   function ranking(limit) {
     limit = limit || 10;
     if (!cloud) return Promise.resolve([]);
@@ -165,6 +177,6 @@
   window.CloudAuth = {
     init: init, isCloud: function () { return cloud; },
     register: register, login: login, logout: logout, me: me,
-    pullBest: pullBest, pushBest: pushBest, ranking: ranking
+    pullBest: pullBest, pushBest: pushBest, resetBest: resetBest, ranking: ranking
   };
 })();

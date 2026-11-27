@@ -413,3 +413,17 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - **踩坑**：`maybeShowOfflineCard()` 里必须 `render()`，否则补算后的 `toilet` 只写进存档，DOM 上冲水按钮还是旧的 `disabled` 状态（真机验证因此超时过一次）。
 
 **验证**：`_verify_offcard.mjs` 真机 22/22 通过——首屏不弹、撞 10 分钟上限文案与升级动机、卡内升级到 30 分钟并落档、下一档 1 小时、关闭/保持、2 小时只算 30 分钟、未撞上限提示、满容器停工说明、0 pageerror / 0 consoleError。桌面与手机截图确认卡片完整可读。
+
+## 17. 按钮文案精简 + 重置账号全量清零（2026-11-27）
+
+**需求**：用户反馈按钮备注太多，参考一般游戏精简文案；「重新开始」改为重置账号所有数据（皮肤解锁、容器、背包、排行榜）。
+
+**文案**：`🤖 小屎崽：开 → 🤖 自动：开`、`⬆️ 升级 → 水箱 → ⬆️ 升级：水箱`、`⬆️ 升级离线时长 → 30 分钟（测试期免费） → ⬆️ 离线升级 → 30 分钟`、`收下这些屎 → 收下`、`重新开始 → 重置账号`；自动开关 toast 也压成「自动产出已开/已关」。
+
+**实现**：
+- `cloud.js` 新增 `resetBest(username)`：查 `id` 后 `update({best:0}).eq('id')`，沿用 RLS 行级隔离（只能改自己）；失败返回 false，不抛错。导出到 `window.CloudAuth.resetBest`。
+- `game.js` 的 `doReset()` 从「只清容器」升级为全量清零：`bag/toilet/lv/best/vesselLevel/combo/comboBest/curSkin` 归位，自动助手设置与 `lastAutoAt` 回配置默认，删除 `ls_save_v1 / ls_best / ls_combo_best / ls_skin`，重新 `applySkin()` + `renderSkins()`，**保留 `ls_me` 登录态**；再调 `resetBest` 清云端榜。
+- 新增 `#resetOverlay` 确认卡（确认重置 / 取消），点遮罩等于取消；REVIVE 广告回调改成先弹确认卡。
+- `doReset()` 定义在皮肤段之前，但 `comboBest / renderSkins / lastOfflineRes` 都是 `var` 或函数声明，靠提升可访问。
+
+**验证**：`_verify_reset.mjs` 真机 21/21 通过——短文案、确认弹窗与取消不清档、确认后背包/容器/皮肤/连击/自动设置归零、夜壶与 0 分、云端 `resetBest` 收到正确用户名、登录态保留、黄金皮肤重新上锁、离线升级与收下按钮短文案、0 pageerror / 0 consoleError。

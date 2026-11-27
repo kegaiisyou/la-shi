@@ -718,11 +718,11 @@
     </div>
     <div class="msg" id="msg">🎒 背包：<span id="best">0</span> 坨 · 云端同步</div>
     <div class="btns">
-      <button id="autoToggle" class="ghost sm">🤖 小屎崽：开</button>
-      <button id="upgrade" class="ghost">⬆️ 升级 → 水箱</button>
+      <button id="autoToggle" class="ghost sm">🤖 自动：开</button>
+      <button id="upgrade" class="ghost">⬆️ 升级：水箱</button>
       <button id="skin" class="ghost">🎨 皮肤</button>
       <button id="rank" class="ghost">🏆 排行</button>
-      <button id="reset" class="ghost">重新开始</button>
+      <button id="reset" class="ghost">重置账号</button>
     </div>
     <a id="adBanner" class="ad-banner"></a>
   </footer>
@@ -789,8 +789,18 @@
       <div class="offline-row" id="offCapRow"><span>离线上限</span><b id="offCap">10 分钟</b></div>
     </div>
     <div class="cap-note" id="offNote"></div>
-    <button id="offUpgrade" class="primary">⬆️ 升级离线时长</button>
-    <button id="offClose" class="close">收下这些屎</button>
+    <button id="offUpgrade" class="primary">⬆️ 离线升级</button>
+    <button id="offClose" class="close">收下</button>
+  </div>
+</div>
+
+<!-- 重置账号 -->
+<div class="overlay" id="resetOverlay">
+  <div class="card">
+    <h2>重置账号</h2>
+    <div class="support-note">清空背包、容器、皮肤解锁和排行榜。无法撤销。</div>
+    <button id="resetConfirm" class="primary">确认重置</button>
+    <button id="resetCancel" class="close">取消</button>
   </div>
 </div>
 
