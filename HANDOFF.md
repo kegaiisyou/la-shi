@@ -334,3 +334,4 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 4. 口径：榜单 `best` 已是累计入袋数；老账号云端旧值只有被本地 `bag` 超过才会覆盖。
 5. 同步失败：`pushBest` 返回 false（换设备导致 `anon_uid` 与当前匿名身份不符，RLS 静默过滤；或网络错误）现在会 toast 提示，不再无声失败。
 验证：`_verify_rank_sync.js` mock 真机 3/3 通过（冲水即时 push、榜单显示新值、未登录提示）。
+- **测试号清理（2026-11-27）**：线上曾残留未绑定 `anon_uid` 的历史测试号 `id=8 / 带薪拉屎 / best=0`，RLS 导致它永远无法更新、却占着榜单。已用 `tcb db execute -e la-shi-d9g35yrnaef3ef5b9 --sql "DELETE FROM public.ls_users WHERE id = 8 AND anon_uid IS NULL"` 精确删除（AffectedRows=1）；现库仅剩 `id=7 / 拉屎大王`（已绑定，best=10）。CLI 用默认角色即可，`--role postgres` 会被拼成不存在的角色名而报错。
