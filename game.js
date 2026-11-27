@@ -116,7 +116,7 @@
     return '<svg class="poop-svg skin-' + skin.id + (skin.rainbow ? ' rainbow' : '') + '" viewBox="0 0 210 210" xmlns="http://www.w3.org/2000/svg">' +
       capeMarkup() + tiers() + '</svg>';
   }
-  function spawnLandedPoop(skin, combo, dir) {
+  function spawnLandedPoop(skin, combo, dir, instant) {
     var pile = $('poopPile');
     if (!pile) return;
     var i = landed.length, row = Math.floor(i / 5), col = i % 5;
@@ -136,7 +136,7 @@
     if (!(T > .2 && T < 1.4)) T = .7;
     var vx = (x1 - x0) / T;
     var el = document.createElement('div');
-    el.className = 'landed-poop' + (combo >= 8 ? ' hot' : '');
+    el.className = 'landed-poop' + (combo >= 8 ? ' hot' : '') + (instant ? ' instant' : '');
     el.style.cssText = varsStyle(skin) +
       ';width:' + sz + 'px;height:' + sz + 'px;z-index:' + (10 + i) +
       ';--rot:' + rot.toFixed(1) + 'deg;--flydur:' + T.toFixed(3) + 's;';
@@ -144,7 +144,7 @@
     el.style.transform = 'translate(' + (x0 - sz / 2).toFixed(1) + 'px,' + (y0 - sz / 2).toFixed(1) + 'px)';
     pile.appendChild(el);
     landed.push(el);
-    flyers.push({ el: el, x0: x0, y0: y0, vx: vx, vy0: vy0, g: g, t: 0, T: T, sz: sz });
+    if (!instant) flyers.push({ el: el, x0: x0, y0: y0, vx: vx, vy0: vy0, g: g, t: 0, T: T, sz: sz });
     if (landed.length > MAX_LANDED) {
       var old = landed.shift();
       old.classList.add('gone');
@@ -156,6 +156,11 @@
     var pile = $('poopPile');
     if (pile) pile.innerHTML = '';
     landed.length = 0; flyers.length = 0;
+  }
+  /* 刷新后把存档里的便池坨数原样摆回去，不播飞出动画 */
+  function restorePile() {
+    var skin = skinById(curSkin);
+    for (var i = 0; i < toilet; i++) spawnLandedPoop(skin, 0, 0, true);
   }
 
   /* 一坨飞走后，原地回到初始种子状态，等待玩家重新捏下一坨 */
@@ -183,9 +188,27 @@
   /* ============================================================
      2. 状态
      ============================================================ */
-  var score = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
+  var TOILET_CAP = 5, SAVE_KEY = 'ls_save_v1';
+  var bag = 0, toilet = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
   function need(n) { return 10 * n * n; }
-  var landed = [], flyers = [], MAX_LANDED = 20;
+  function levelFrom(n) { var l = 1; while (n >= need(l)) l++; return l; }
+  var landed = [], flyers = [], MAX_LANDED = TOILET_CAP;
+  function clampInt(v, min, max) { v = parseInt(v, 10); if (!isFinite(v)) v = min; return Math.max(min, Math.min(max, v)); }
+  function loadSave() {
+    try {
+      var o = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+      if (o) { bag = clampInt(o.bag, 0, 1000000000); toilet = clampInt(o.toilet, 0, TOILET_CAP); }
+    } catch (e) {}
+    var oldBest = localBest();                 /* 旧版单局最高分迁移为背包起始值，不丢老进度 */
+    if (oldBest > bag) bag = oldBest;
+    if (bag > 0) setLocalBest(bag);
+    best = bag;
+    lv = levelFrom(bag);
+  }
+  function persist() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, bag: bag, toilet: toilet })); } catch (e) {}
+    setLocalBest(bag);
+  }
 
   /* ============================================================
      3. 画布与粒子
@@ -574,6 +597,10 @@
     });
   }
   function sfxUnlock() { tone(680, 1020, .22, 'triangle', .12); setTimeout(function () { tone(1020, 1360, .18, 'sine', .08); }, 130); }
+  function sfxFlush() {
+    noise(520, .34, .20); tone(620, 190, .3, 'sine', .13);
+    setTimeout(function () { tone(300, 120, .22, 'sine', .08); }, 120);
+  }
 
   var soundBtn = $('soundBtn');
   soundBtn.onclick = function () {
@@ -624,6 +651,7 @@
   var comboEl = $('combo'), comboNum = $('comboNum');
 
   function burst(ev) {
+    if (toilet >= TOILET_CAP) { pressing = false; pq = 0; return; }
     var skin = skinById(curSkin);
     var c = anchor();
     var r = stage.getBoundingClientRect();
@@ -680,45 +708,35 @@
       if (combo === 30) { banner('手感火热！'); unlockByCombo('super'); }
     }
 
-    /* 计分 */
-    score++;
+    /* 便池：先存 5 坨，冲水后才进背包 */
+    toilet++;
+    persist();
     if (ADS.INTERSTITIAL && ADS.INTERSTITIAL.EVERY > 0) {
       adBurstCount++;
       if (adBurstCount % ADS.INTERSTITIAL.EVERY === 0) {
         setTimeout(function () { showAd(ADS.INTERSTITIAL, '跳过'); }, 380);
       }
     }
-    $('score').classList.remove('bump'); void $('score').offsetWidth;
-    $('score').classList.add('bump');
-
-    if (score > best) {
-      best = score; setLocalBest(best); scheduleSave();
-      for (var i = 0; i < SKINS.length; i++) {
-        if (SKINS[i].need === best) {
-          banner('解锁 · ' + SKINS[i].name);
-          sfxUnlock();
-          confetti(c.x, c.y + 10, 26);
-          renderSkins();
-          break;
-        }
-      }
-    }
-    while (score >= need(lv)) {
-      lv++;
-      banner('LEVEL UP · Lv.' + lv);
-      sfxLevel();
-      confetti(c.x, c.y + 6, 40);
-      ring(c.x, c.y + 20, 20, 'rgba(255,220,150,.95)', 9, 420, 1);
-      pulse(14);
-      if (navigator.vibrate) navigator.vibrate([18, 40, 26]);
+    $('toiletPct').classList.remove('bump'); void $('toiletPct').offsetWidth;
+    $('toiletPct').classList.add('bump');
+    if (toilet === TOILET_CAP) {
+      banner('便池满了 · 冲马桶入袋！');
+      toast('点「冲马桶」把这 5 坨收进背包');
+      pulse(8);
     }
     render();
   }
 
   /* 按住蓄力：按住就一直挤，挤满一节「啪」地落下来；松手原路退回 */
   gaugeEl = $('gauge'); gaugeFill = $('gaugeFill');
+  var lastFullTip = 0;
   function pressOn(e) {
     if (e && e.preventDefault) e.preventDefault();
+    if (toilet >= TOILET_CAP) {
+      var t = performance.now();
+      if (t - lastFullTip > 1400) { lastFullTip = t; toast('便池满了，先冲马桶吧！'); }
+      return;
+    }
     pressing = true;
     var h = $('hint'); if (h) h.classList.add('gone');
     if (!AC && !muted) { try { audioReady(); } catch (err) {} }
@@ -737,13 +755,51 @@
   poop.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
   function doReset() {
-    score = 0; lv = 1; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
+    toilet = 0; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     clearLanded();
-    render();
-    toast('已重新开始');
+    persist(); render();
+    toast('便池已清空，背包不受影响');
   }
+  /* 冲马桶：便池里的 5 坨一次性转入背包，并升等级 / 同步云端 */
+  function flushToilet() {
+    if (toilet <= 0) { toast('便池是空的，先憋几坨～'); return; }
+    var n = toilet, pileEl = $('poopPile'), c = anchor();
+    landed.slice().forEach(function (el) { el.classList.add('flushed'); });
+    if (pileEl) pileEl.classList.add('flushing');
+    setTimeout(function () { clearLanded(); if (pileEl) pileEl.classList.remove('flushing'); }, 460);
+    toilet = 0;
+    var oldBag = bag;
+    bag += n; best = bag;
+    persist(); scheduleSave();
+    ring(c.x, c.y + 26, 22, 'rgba(150,225,255,.95)', 8, 520, 1.1);
+    confetti(c.x, c.y + 10, 22);
+    sfxFlush(); pulse(11);
+    if (navigator.vibrate) navigator.vibrate([24, 40, 18]);
+    banner('冲马桶！+' + n + ' 入袋');
+    var newLv = levelFrom(bag);
+    if (newLv > lv) {
+      lv = newLv;
+      setTimeout(function () {
+        banner('LEVEL UP · Lv.' + lv); sfxLevel();
+        confetti(c.x, c.y + 6, 40);
+        ring(c.x, c.y + 20, 20, 'rgba(255,220,150,.95)', 9, 420, 1);
+        pulse(14);
+      }, 480);
+    }
+    for (var i = 0; i < SKINS.length; i++) {
+      if (oldBag < SKINS[i].need && bag >= SKINS[i].need) {
+        setTimeout(function (name) {
+          return function () { banner('解锁 · ' + name); sfxUnlock(); confetti(anchor().x, anchor().y, 26); };
+        }(SKINS[i].name), 900);
+        renderSkins();
+        break;
+      }
+    }
+    render();
+  }
+  $('flush').addEventListener('click', flushToilet);
   $('reset').addEventListener('click', function () {
     if (adValid(ADS.REVIVE)) { adAfterClose = doReset; showAd(ADS.REVIVE, '继续游戏'); }
     else doReset();
@@ -756,12 +812,19 @@
   function setLocalBest(v) { try { localStorage.setItem('ls_best', v); } catch (e) {} }
 
   function render() {
-    $('score').textContent = score;
+    $('score').textContent = bag;
     $('barLv').textContent = 'Lv.' + lv;
-    $('barPct').textContent = score + ' / ' + need(lv);
+    $('barPct').textContent = bag + ' / ' + need(lv);
     var from = need(lv - 1), to = need(lv);
-    $('bar').style.width = Math.min(100, Math.max(0, (score - from) / (to - from) * 100)) + '%';
-    $('best').textContent = best;
+    $('bar').style.width = Math.min(100, Math.max(0, (bag - from) / (to - from) * 100)) + '%';
+    $('best').textContent = bag;
+    $('toiletPct').textContent = toilet + ' / ' + TOILET_CAP;
+    var slots = $('toiletSlots').children;
+    for (var i = 0; i < slots.length; i++) slots[i].classList.toggle('on', i < toilet);
+    var full = toilet >= TOILET_CAP, fb = $('flush');
+    fb.disabled = !full;
+    fb.classList.toggle('ready', full);
+    fb.textContent = full ? '🚽 冲马桶 +' + TOILET_CAP : '🚽 冲马桶 ' + toilet + '/' + TOILET_CAP;
   }
 
   /* ============================================================
@@ -774,7 +837,7 @@
       $('useracts').innerHTML = '<button id="logout" class="sm ghost">退出</button>';
       $('logout').onclick = function () {
         window.CloudAuth.logout();
-        best = localBest(); refreshUser(); render(); renderSkins();
+        refreshUser(); render(); renderSkins();
         toast('已退出登录');
       };
     } else {
@@ -785,13 +848,28 @@
     if ($('mode')) $('mode').textContent = cloudOn ? '云端' : '本地';
   }
 
+  /* 云端 best 触发器限制单次增量 ≤50：老档迁移时分段追平，避免一次写大数被拒 */
+  function syncBagToCloud() {
+    var me = window.CloudAuth.me();
+    if (!cloudOn || !me) return;
+    var guard = 0;
+    function step() {
+      if (guard++ > 200) return;
+      window.CloudAuth.pullBest(me.user).then(function (b) {
+        if (b >= bag) return;
+        var next = Math.min(bag, b + 50);
+        window.CloudAuth.pushBest(me.user, next).then(function (done) {
+          if (done && next < bag) setTimeout(step, 60);
+        });
+      });
+    }
+    step();
+  }
   function scheduleSave() {
     var me = window.CloudAuth.me();
     if (!cloudOn || !me) return;
     clearTimeout(saveTimer);
-    saveTimer = setTimeout(function () {
-      window.CloudAuth.pushBest(me.user, best);
-    }, (window.LS_CONFIG && window.LS_CONFIG.SAVE_DEBOUNCE_MS) || 1500);
+    saveTimer = setTimeout(syncBagToCloud, (window.LS_CONFIG && window.LS_CONFIG.SAVE_DEBOUNCE_MS) || 1500);
   }
 
   /* ============================================================
@@ -875,8 +953,8 @@
       toast('欢迎回来，' + (res.me ? res.me.nickname : ''));
       if (res.me && cloudOn) {
         window.CloudAuth.pullBest(res.me.user).then(function (b) {
-          var newBest = b > localBest() ? b : localBest();
-          if (newBest !== best) { best = newBest; setLocalBest(best); render(); renderSkins(); }
+          if (b > bag) { bag = b; best = bag; persist(); render(); renderSkins(); }
+          else if (b < bag) scheduleSave();
         });
       }
     });
@@ -987,6 +1065,8 @@
   buildRig();
   applySkin(false);
   fitCanvas();
+  loadSave();
+  restorePile();
   requestAnimationFrame(tick);
   window.addEventListener('resize', function () { fitCanvas(); });
   window.addEventListener('orientationchange', function () { setTimeout(fitCanvas, 180); });
@@ -1000,13 +1080,14 @@
       var m = window.CloudAuth.me();
       if (m) {
         window.CloudAuth.pullBest(m.user).then(function (b) {
-          if (b > 0) { best = b; setLocalBest(best); render(); renderSkins(); }
+          if (b > bag) { bag = b; best = bag; persist(); render(); renderSkins(); }
+          else if (b < bag) scheduleSave();
         });
       }
     }
   }
   bootCloud();
-  if (!cloudOn) best = localBest();
+  best = bag;
   render(); renderSkins();
   window.addEventListener('cloudbase-ready', bootCloud);
   /* 事件可能在监听注册前触发，用标志兜底 */

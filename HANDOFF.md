@@ -1,4 +1,4 @@
-# 拉屎大作战 — AI 协作交接文档
+﻿# 拉屎大作战 — AI 协作交接文档
 
 > 面向接手的 AI：读完本文档即可独立改代码、验证、部署、推送、迭代。
 > 面向用户的简介见 `README.md`。
@@ -7,7 +7,7 @@
 
 ## 0. 一句话现状
 
-H5 长按憋屎小游戏，**纯静态**（无构建步骤）。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近一次提交 `187f8a0`（2026-11-27，打赏入口 + 内嵌广告位），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。变现：HUD 顶栏 💖「支持作者」打赏入口 + 三种内嵌广告位（底部 banner / 结算插屏 / 开屏·复活），均由 `config.js` 的 `SUPPORT` / `ADS` 驱动；当前线上为空配置降级态（不显示任何广告、不打断玩法），填配置后跑 `deploy.ps1` 生效（详见 §10）。
+H5 长按憋屎小游戏，**纯静态**（无构建步骤）。**2026-11-27 新增便池存档**：便池最多 5 坨、满池点「🚽 冲马桶」才转入背包；`ls_save_v1` 持久化 `bag/toilet`，刷新后屎堆原样恢复，旧 `ls_best` 迁移为背包起始值，云端按 ≤50 分段同步。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近一次提交 `187f8a0`（2026-11-27，打赏入口 + 内嵌广告位），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。变现：HUD 顶栏 💖「支持作者」打赏入口 + 三种内嵌广告位（底部 banner / 结算插屏 / 开屏·复活），均由 `config.js` 的 `SUPPORT` / `ADS` 驱动；当前线上为空配置降级态（不显示任何广告、不打断玩法），填配置后跑 `deploy.ps1` 生效（详见 §10）。
 
 ---
 
@@ -219,6 +219,7 @@ $env:GIT_TERMINAL_PROMPT = '0'
 ## 7. 迭代历史（git log）
 
 ```
+（未提交）feat: 便池存档 + 冲马桶入袋（ls_save_v1，满 5 冲水，best 改累计入袋口径）
 187f8a0 feat: 打赏入口 💖「支持作者」+ 三种内嵌广告位（config.js SUPPORT / ADS 驱动）
 2b38e77 feat: 捏出即飞走的屎堆 + 抛物线弹射 + 惊奇表情 + 长按防选中
 60585c3 feat: 长按蓄力憋屎玩法 + 压力仪表 + 修 hint 恢复 bug
@@ -238,11 +239,12 @@ db332e7 feat: 添加一键部署脚本 deploy.ps1 并更新文档
 
 ## 8. 当前玩法速查（改玩法前先读）
 
-- 交互：**pointerdown 开始按住**，持续约 0.87 秒憋满 → `burst()` 一坨飞出落地堆着、+1 分；未满松手 → 憋回去（pq 回落）。飞出的屎 = 双层元素：外层 flyers 数组在 tick 里跑抛物线位移（vx 匀速 + vy0 向上 + g=2100），内层 CSS `poopLaunch` 负责压扁→弹射→落地回弹（时长 `--flydur` 与 JS 飞行时间同步）。`resetToSeed()` 必须**立即**调用（不能延迟，否则出现两坨），惊奇表情靠给飞出的 el 加 `charge` class 320ms 实现。
+- 交互：**pointerdown 开始按住**，持续约 0.87 秒憋满 → `burst()` 一坨飞出落地堆着、+1 坨进便池（满 5 才冲水入袋）；未满松手 → 憋回去（pq 回落）。飞出的屎 = 双层元素：外层 flyers 数组在 tick 里跑抛物线位移（vx 匀速 + vy0 向上 + g=2100），内层 CSS `poopLaunch` 负责压扁→弹射→落地回弹（时长 `--flydur` 与 JS 飞行时间同步）。`resetToSeed()` 必须**立即**调用（不能延迟，否则出现两坨），惊奇表情靠给飞出的 el 加 `charge` class 320ms 实现。
 - 长按防选中：`*` 全局 `-webkit-user-select:none; user-select:none; -webkit-touch-callout:none;` + `selectstart` 拦截（INPUT/TEXTAREA 除外，登录框要能打字）。
 - 连击：1.15 秒内连续爆出累计 combo；15 解锁墨镜、30 解锁超人（`unlockByCombo`）。
-- 皮肤：9 款，按 `best` 或 `comboBest`（`ls_combo_best`）解锁；彩虹有流光动画；墨镜/超人是 SVG 装饰。
-- 升级：`need(n) = 10 * n²`。
+- 皮肤：9 款，按 `best`（= `bag` 累计入袋数）或 `comboBest`（`ls_combo_best`）解锁；彩虹有流光动画；墨镜/超人是 SVG 装饰。
+- 升级：`need(n) = 10 * n²`；`lv` 由 `bag` 反算（`levelFrom()`），冲水后一次性升级，不再按单局分数。
+- 存档：`ls_save_v1 = {v:1,bag,toilet}`；`bag` 同时镜像到 `ls_best` 与云端 `best`。满池拦截在 `pressOn()` 和 `burst()` 双保险；冲水函数 `flushToilet()`；刷新恢复用 `restorePile()` 的 `instant` 模式（不播飞行动画）。
 - 音效：WebAudio 合成（无外部音频文件），有静音开关 `ls_mute`。
 - 无障碍：尊重 `prefers-reduced-motion`；角色可键盘操作（Space/Enter）。
 
@@ -302,5 +304,24 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - 四种配置：`BANNER`（footer 底部常驻矮条）、`INTERSTITIAL.EVERY`（每 N 次爆屎弹一次插屏，0=关闭）、`OPEN`（开屏，`ONCE_PER_SESSION` 会话去重）、`REVIVE`（点「重新开始」时先弹，关掉才真正重置）。
 - 每个位填 `IMAGE` 才生效；`LINK` 点击跳转、`TEXT` 文案、`TITLE` 标题、`CLOSE_TEXT` 关闭按钮文案。
 - 插屏/开屏/复活共用 `#adOverlay` 动态渲染；`#adClose` 和点遮罩都可关闭。复活广告的关闭回调 `adAfterClose` 执行真正的 `doReset()`，所以分数在广告关掉前保持不变。
-- `adBurstCount` 在 `burst()` 的 `score++` 后累加；`ADS.ENABLED:false` 或 `IMAGE` 留空时全部不生效，玩法零影响。
+- `adBurstCount` 在 `burst()` 的 `toilet++` 后累加；`ADS.ENABLED:false` 或 `IMAGE` 留空时全部不生效，玩法零影响。
 - 验证：`_verify_ads.js`（已清理）真机覆盖空配置降级 / banner 渲染 / 插屏触发与关闭 / 复活拦截与重置 / 开屏会话去重 / 皮肤与打赏回归，0 pageerror + 0 consoleError。
+
+---
+
+## 11. 便池存档 + 冲马桶入袋（2026-11-27）
+
+**需求**：玩家每次重开网页便便归零；改成有上限的便池（5 坨），满 5 后点「冲马桶」才把 5 坨转入背包。
+
+**口径变更（必须记住）**：`best` 不再是"单局最高分"（便池上限 5 会让皮肤/等级/榜单全废），而是**累计入袋数 `bag`**。页面大数字、`ls_best`、皮肤解锁、`levelFrom(bag)`、云端 `ls_users.best`、排行榜全部同口径。旧 `ls_best` 迁移为 `bag` 起始值，不丢老进度。
+
+**实现要点**：
+- `game.js` 状态：`TOILET_CAP=5`、`bag`、`toilet`、`SAVE_KEY='ls_save_v1'`；`loadSave()`/`persist()` 读写 `{v:1,bag,toilet}`，并镜像 `ls_best`。
+- `burst()`：满池直接 return（`pressOn()` 也拦并 toast）；正常一坨只 `toilet++`，不升等级、不解锁皮肤。
+- `flushToilet()`：`toilet<=0` 提示；把 `landed` 元素加 `.flushed` 播冲走动画，460ms 后 `clearLanded()`；`bag += toilet`、`toilet=0`、`persist()`、`scheduleSave()`，再统一处理升级/解锁/音效/震动/飘字。
+- 解锁判定改成 `oldBag < need && bag >= need`，避免冲水跨过整 5 时漏解锁。
+- 「重新开始」`doReset()` 只清便池，不动背包。
+- 刷新恢复：`spawnLandedPoop(..., instant=true)` 直接落位并加 `.instant` 关掉飞出动画；`restorePile()` 在启动 `loadSave()` 之后调用。
+- 云端 `best` 有单次增量 ≤50 的触发器，`syncBagToCloud()` 用 `pullBest` + `pushBest` 每轮最多 +50 分段追平（老档 300 分也能上云）；`scheduleSave()` 防抖后调它。登录/启动时云端值更高则覆盖本地，更低则反向分段同步。
+
+**验证**：`_verify_toilet.js`（临时脚本，验证后清理）真机 8 项全绿：初始态、5 坨入池、刷新保留 5 坨+落地堆、满池拦截、冲水后 bag=5/toilet=0、存档写入、再刷新保留、旧档 `ls_best=37` 迁移；0 pageerror + 0 consoleError。满池截图 `_toilet_full.png` 检查布局无溢出。

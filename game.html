@@ -132,6 +132,12 @@
   .landed-poop.hot svg { filter: drop-shadow(0 0 6px rgba(255,190,90,.85)); }
   .landed-poop.gone { opacity: 0; }
   .landed-poop.gone .poop-inner { animation: none; transform: scale(.7) rotate(var(--rot)); }
+  .landed-poop.instant .poop-inner { animation: none; transform: rotate(var(--rot)); }
+  .landed-poop.flushed { animation: poopFlush .44s cubic-bezier(.5,0,.9,.5) forwards; }
+  @keyframes poopFlush {
+    0%   { opacity: 1; }
+    100% { opacity: 0; transform: translateY(150px) scale(.18) rotate(80deg); }
+  }
   /* 挤压弹射：先被压扁 → duang 弹起 → 空中收拢 → 落地压扁回弹 */
   @keyframes poopLaunch {
     0%   { opacity: 0; transform: scale(3.4, 1.75) rotate(-7deg); }
@@ -311,6 +317,46 @@
   .msg {
     min-height: 19px; font-size: 11.5px; color: var(--ink2);
     text-align: center; margin: 9px 0 10px; letter-spacing: .3px;
+  }
+  /* ---------- 便池：5 格容量，冲水后 5 坨才进背包 ---------- */
+  .toilet-row {
+    width: 100%; max-width: 340px; margin: 10px auto 0;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .toilet-info { flex: 1; min-width: 0; }
+  .toilet-meta {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 11px; color: var(--ink2); margin-bottom: 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .toilet-meta b { color: #7A4A22; font-size: 12px; }
+  .toilet-meta b.bump { animation: scoreBump .26s cubic-bezier(.2,1.7,.42,1); }
+  .toilet-slots { display: flex; gap: 4px; }
+  .toilet-slots i {
+    flex: 1; height: 11px; border-radius: 7px;
+    background: linear-gradient(180deg, #EAD7B8, #DCC19A);
+    box-shadow: inset 0 1px 2px rgba(120,80,40,.18), inset 0 -1px 0 rgba(255,255,255,.5);
+    transition: background .2s, box-shadow .2s;
+  }
+  .toilet-slots i.on {
+    background: linear-gradient(180deg, #F4C57C, #C87B2C);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.6), 0 0 7px rgba(210,130,45,.45);
+  }
+  button.flush {
+    padding: 9px 12px; font-size: 12px; border-radius: 12px; white-space: nowrap;
+    background: linear-gradient(180deg, #E9F6FB 0%, #CFE8F4 100%);
+    color: #2B6E94; box-shadow: 0 3px 0 rgba(46,120,160,.25), 0 6px 12px rgba(46,120,160,.15);
+  }
+  button.flush:active { box-shadow: 0 0 0 rgba(46,120,160,.25); }
+  button.flush.ready {
+    background: linear-gradient(180deg, #7FD3F7 0%, #2E9BD1 100%);
+    color: #FFF; box-shadow: 0 3px 0 #1B6E9C, 0 7px 16px rgba(46,155,209,.35);
+    animation: flushPulse 1.25s ease-in-out infinite;
+  }
+  button.flush.ready:active { box-shadow: 0 0 0 #1B6E9C; }
+  @keyframes flushPulse {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.13); }
   }
   .btns { display: flex; gap: 9px; justify-content: center; flex-wrap: wrap; }
 
@@ -557,7 +603,14 @@
       <div class="bar-label"><span><b id="barLv">Lv.1</b></span><span id="barPct">0 / 10</span></div>
       <div class="bar"><i id="bar"></i><span class="bar-shine"></span></div>
     </div>
-    <div class="msg" id="msg">最高纪录：<span id="best">0</span></div>
+    <div class="toilet-row" id="toiletRow">
+      <div class="toilet-info">
+        <div class="toilet-meta"><span>🚽 便池</span><b id="toiletPct">0 / 5</b></div>
+        <div class="toilet-slots" id="toiletSlots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <button id="flush" class="flush" disabled>🚽 冲马桶</button>
+    </div>
+    <div class="msg" id="msg">🎒 背包：<span id="best">0</span> 坨 · 云端同步</div>
     <div class="btns">
       <button id="skin" class="ghost">🎨 皮肤</button>
       <button id="rank" class="ghost">🏆 排行</button>
