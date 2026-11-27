@@ -195,17 +195,14 @@
   var VESSELS = (window.LS_CONFIG && window.LS_CONFIG.VESSELS) || [];
   if (!VESSELS.length) VESSELS = [{ name:'蹲坑', short:'蹲坑', cap:5, need:0, verb:'冲', label:'冲蹲坑', icon:'🚽', fx:'ripple' }];
   var bag = 0, toilet = 0, lv = 1, best = 0, cloudOn = false, saveTimer = null;
+  var vesselLevel = 0;   /* 手动升级的容器档位，默认蹲坑 */
   function need(n) { return 10 * n * n; }
   function levelFrom(n) { var l = 1; while (n >= need(l)) l++; return l; }
-  function vesselFor(n) {
-    var v = VESSELS[0];
-    for (var i = 0; i < VESSELS.length; i++) {
-      if (n >= VESSELS[i].need) v = VESSELS[i]; else break;
-    }
-    return v;
+  function currentVessel() {
+    return VESSELS[Math.max(0, Math.min(VESSELS.length - 1, vesselLevel))];
   }
   function vesselIndex(v) { var i = VESSELS.indexOf(v); return i < 0 ? 0 : i; }
-  function visualCap(v) { return Math.min((v || vesselFor(bag)).cap, 8); }
+  function visualCap(v) { return Math.min((v || currentVessel()).cap, 8); }
   function trimZeros(s) { return s.indexOf('.') < 0 ? s : s.replace(/\.?0+$/, ''); }
   function fmt(n) {
     n = Math.floor(n) || 0;
@@ -219,17 +216,27 @@
   function loadSave() {
     try {
       var o = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
-      if (o) { bag = clampInt(o.bag, 0, 1000000000000000); toilet = clampInt(o.toilet, 0, 1000000000000000); }
+      if (o) {
+        bag = clampInt(o.bag, 0, 1000000000000000);
+        toilet = clampInt(o.toilet, 0, 1000000000000000);
+        if (typeof o.vesselLevel === 'number') {
+          vesselLevel = clampInt(o.vesselLevel, 0, VESSELS.length - 1);
+        } else {
+          /* 老档没有档位：默认蹲坑，但至少选一个装得下现有坨数的档，避免刷新丢屎 */
+          vesselLevel = 0;
+          while (vesselLevel + 1 < VESSELS.length && currentVessel().cap < toilet) vesselLevel++;
+        }
+      }
     } catch (e) {}
     var oldBest = localBest();                 /* 旧版单局最高分迁移为背包起始值，不丢老进度 */
     if (oldBest > bag) bag = oldBest;
     if (bag > 0) setLocalBest(bag);
-    toilet = clampInt(toilet, 0, vesselFor(bag).cap);   /* 脏数据兜底，容器升级只会变大 */
+    toilet = clampInt(toilet, 0, currentVessel().cap);   /* 脏数据兜底 */
     best = bag;
     lv = levelFrom(bag);
   }
   function persist() {
-    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 1, bag: bag, toilet: toilet })); } catch (e) {}
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ v: 2, bag: bag, toilet: toilet, vesselLevel: vesselLevel })); } catch (e) {}
     setLocalBest(bag);
   }
 
@@ -676,7 +683,7 @@
   var comboEl = $('combo'), comboNum = $('comboNum');
 
   function burst(ev) {
-    if (toilet >= vesselFor(bag).cap) { pressing = false; pq = 0; return; }
+    if (toilet >= currentVessel().cap) { pressing = false; pq = 0; return; }
     var skin = skinById(curSkin);
     var c = anchor();
     var r = stage.getBoundingClientRect();
@@ -744,8 +751,8 @@
     }
     $('toiletPct').classList.remove('bump'); void $('toiletPct').offsetWidth;
     $('toiletPct').classList.add('bump');
-    if (toilet === vesselFor(bag).cap) {
-      var fullV = vesselFor(bag);
+    if (toilet === currentVessel().cap) {
+      var fullV = currentVessel();
       banner(fullV.name + '满了 · ' + fullV.label + '入袋！');
       toast('点「' + fullV.label + '」把 ' + fmt(toilet) + ' 坨收进背包');
       pulse(8);
@@ -758,8 +765,8 @@
   var lastFullTip = 0;
   function pressOn(e) {
     if (e && e.preventDefault) e.preventDefault();
-    if (toilet >= vesselFor(bag).cap) {
-      var t = performance.now(), fv = vesselFor(bag);
+    if (toilet >= currentVessel().cap) {
+      var t = performance.now(), fv = currentVessel();
       if (t - lastFullTip > 1400) { lastFullTip = t; toast(fv.name + '满了，先' + fv.label + '吧！'); }
       return;
     }
@@ -786,13 +793,13 @@
     comboEl.classList.remove('on', 'hot', 'blaze');
     clearLanded();
     persist(); render();
-    toast(vesselFor(bag).name + '已清空，背包不受影响');
+    toast(currentVessel().name + '已清空，背包不受影响');
   }
   /* 冲容器：里面的 1~cap 坨一次性转入背包，并升容器 / 升等级 / 同步云端 */
   function flushToilet() {
-    if (toilet <= 0) { toast(vesselFor(bag).name + '是空的，先憋几坨～'); return; }
+    if (toilet <= 0) { toast(currentVessel().name + '是空的，先憋几坨～'); return; }
     var n = toilet, pileEl = $('poopPile'), c = anchor();
-    var oldVessel = vesselFor(bag), vi = vesselIndex(oldVessel);
+    var oldVessel = currentVessel(), vi = vesselIndex(oldVessel);
     landed.slice().forEach(function (el) { el.classList.add('flushed'); });
     if (pileEl) pileEl.classList.add('flushing');
     setTimeout(function () { clearLanded(); if (pileEl) pileEl.classList.remove('flushing'); }, 460);
@@ -800,7 +807,7 @@
     var oldBag = bag;
     bag += n; best = bag;
     persist(); syncBagToCloud();          /* 冲水立刻同步，不等 1.5s 防抖 */
-    var rc = oldVessel.fx === 'cosmic' ? 'rgba(195,155,255,.95)' :
+    var rc = oldVessel.fx === 'abyss' ? 'rgba(110,170,255,.95)' :
              oldVessel.fx === 'surge' ? 'rgba(120,210,255,.95)' : 'rgba(150,225,255,.95)';
     ring(c.x, c.y + 26, 22 + vi * 2, rc, 8, 520 + vi * 30, 1.1);
     confetti(c.x, c.y + 10, Math.min(22 + vi * 4, 80));
@@ -817,13 +824,6 @@
         pulse(14);
       }, 480);
     }
-    var newVessel = vesselFor(bag);
-    if (newVessel !== oldVessel) {
-      setTimeout(function () {
-        banner('容器升级 · ' + newVessel.name);
-        sfxUnlock(); confetti(anchor().x, anchor().y, 34);
-      }, 1100);
-    }
     for (var i = 0; i < SKINS.length; i++) {
       if (oldBag < SKINS[i].need && bag >= SKINS[i].need) {
         setTimeout(function (name) {
@@ -836,6 +836,18 @@
     render();
   }
   $('flush').addEventListener('click', flushToilet);
+  /* 测试期：手动免费升级容器，后续再把 VESSELS[i].need 变成升级条件 */
+  function upgradeVessel() {
+    if (vesselLevel >= VESSELS.length - 1) { toast('已经是最大容器了'); return; }
+    vesselLevel++;
+    persist(); render();
+    var v = currentVessel(), c = anchor();
+    banner('容器升级 · ' + v.name);
+    sfxUnlock(); confetti(c.x, c.y + 10, 34);
+    ring(c.x, c.y + 20, 24, 'rgba(255,220,150,.95)', 8, 420, 1);
+    toast('容量提升到 ' + fmt(v.cap));
+  }
+  $('upgrade').addEventListener('click', upgradeVessel);
   $('reset').addEventListener('click', function () {
     if (adValid(ADS.REVIVE)) { adAfterClose = doReset; showAd(ADS.REVIVE, '继续游戏'); }
     else doReset();
@@ -848,7 +860,7 @@
   function setLocalBest(v) { try { localStorage.setItem('ls_best', v); } catch (e) {} }
 
   function render() {
-    var v = vesselFor(bag), cap = v.cap, compact = cap > 8;
+    var v = currentVessel(), cap = v.cap, compact = cap > 8;
     $('score').textContent = fmt(bag);
     $('barLv').textContent = 'Lv.' + lv;
     $('barPct').textContent = fmt(bag) + ' / ' + fmt(need(lv));
@@ -870,6 +882,13 @@
     fb.classList.toggle('ready', toilet >= cap);
     fb.textContent = has ? v.icon + ' ' + v.label + ' +' + fmt(toilet) : v.icon + ' ' + v.label + ' 0/' + fmt(cap);
     fb.title = v.name + ' · 容量 ' + fmt(cap);
+    var ub = $('upgrade');
+    if (vesselLevel >= VESSELS.length - 1) {
+      ub.disabled = true; ub.textContent = '⬆️ 已满级';
+    } else {
+      ub.disabled = false;
+      ub.textContent = '⬆️ 升级 → ' + VESSELS[vesselLevel + 1].name;
+    }
   }
 
   /* ============================================================

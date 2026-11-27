@@ -353,3 +353,19 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - 数据库：`public.ls_users.best` 从 `integer` 改为 `bigint`（`ALTER TABLE public.ls_users ALTER COLUMN best TYPE bigint`），否则后期大数 pushBest 会数值越界。触发器 ≤50 与 RLS 不受影响。
 
 **验证**：`_verify_vessels.js` 真机 5/5 通过（默认蹲坑格子模式、bag=137 自动游泳池数字模式、bag=123456/toilet=2345 大数紧凑显示+8 坨、大数冲水后 12.6 万、bag=95→100 升级换名提示）；0 pageerror + 0 consoleError。截图确认手机端按钮/进度条无溢出。
+
+
+---
+
+## 13. 容器命名调整 + 手动升级（2026-11-27，覆盖 §12 的自动升级与旧命名）
+
+**变更原因**：用户反馈后几档「星海/宇宙/太虚/归一」等过于虚无缥缈，且需要补早期档位；同时要求容器默认不自动升级，先用按钮测试。
+
+**新 20 档（全部为具体容器/水体）**：蹲坑(5) → 便槽(12) → 夜壶(20) → 马桶(35) → 水箱(60) → 洗手池(100) → 浴缸(180) → 小水池(300) → 游泳池(500) → 池塘(800) → 湖泊(1500) → 水库(5000) → 江河(2万) → 大海(10万) → 海洋(50万) → 深海(200万) → 海沟(1000万) → 地下海(5000万) → 超级水库(2.5亿) → 全球水网(10亿)。
+
+**手动升级**：
+- 存档升级为 `v:2`，新增 `vesselLevel`（0 起，默认蹲坑）。`currentVessel()` 按 `vesselLevel` 取档，`bag` 增长不再触发容器升级；`VESSELS[i].need` 只是预留字段，条件以后再加。
+- 底部新增 `#upgrade` 按钮，测试期免费点击推进一档，满级禁用。点击后 `persist()` + `render()` + banner「容器升级 · X」+ 音效/彩纸。
+- 老 v1 存档迁移：无 `vesselLevel` 时从 0 开始，用 `while (currentVessel().cap < toilet) vesselLevel++` 选最小可容纳档，避免存量被 clamp 丢失（曾写成看下一档 cap 导致 15 坨被压成 12，已修）。
+- 特效档位 `fx` 从 `cosmic` 改为 `abyss`；`sfxFlush(tier)` 按档位降频。
+- 验证：`_verify_manual.js` 真机 8/8 通过（默认蹲坑、bag=137 不自动升级、点击三次到马桶并切数字模式、刷新持久化、大海档大数显示、旧档 15 坨迁移到夜壶、满级禁用）；0 pageerror + 0 consoleError。截图确认四按钮换行可用。
