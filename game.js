@@ -762,7 +762,7 @@
     persist(); render();
     toast('便池已清空，背包不受影响');
   }
-  /* 冲马桶：便池里的 5 坨一次性转入背包，并升等级 / 同步云端 */
+  /* 冲马桶：便池里的 1~5 坨一次性转入背包，并升等级 / 同步云端 */
   function flushToilet() {
     if (toilet <= 0) { toast('便池是空的，先憋几坨～'); return; }
     var n = toilet, pileEl = $('poopPile'), c = anchor();
@@ -821,10 +821,10 @@
     $('toiletPct').textContent = toilet + ' / ' + TOILET_CAP;
     var slots = $('toiletSlots').children;
     for (var i = 0; i < slots.length; i++) slots[i].classList.toggle('on', i < toilet);
-    var full = toilet >= TOILET_CAP, fb = $('flush');
-    fb.disabled = !full;
-    fb.classList.toggle('ready', full);
-    fb.textContent = full ? '🚽 冲马桶 +' + TOILET_CAP : '🚽 冲马桶 ' + toilet + '/' + TOILET_CAP;
+    var has = toilet > 0, fb = $('flush');
+    fb.disabled = !has;                      /* 有 1~5 坨就能冲，满 5 只是高亮提示 */
+    fb.classList.toggle('ready', toilet >= TOILET_CAP);
+    fb.textContent = has ? '🚽 冲马桶 +' + toilet : '🚽 冲马桶 0/' + TOILET_CAP;
   }
 
   /* ============================================================

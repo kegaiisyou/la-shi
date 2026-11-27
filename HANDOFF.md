@@ -7,7 +7,7 @@
 
 ## 0. 一句话现状
 
-H5 长按憋屎小游戏，**纯静态**（无构建步骤）。**2026-11-27 新增便池存档**：便池最多 5 坨、满池点「🚽 冲马桶」才转入背包；`ls_save_v1` 持久化 `bag/toilet`，刷新后屎堆原样恢复，旧 `ls_best` 迁移为背包起始值，云端按 ≤50 分段同步。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近一次提交 `187f8a0`（2026-11-27，打赏入口 + 内嵌广告位），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。变现：HUD 顶栏 💖「支持作者」打赏入口 + 三种内嵌广告位（底部 banner / 结算插屏 / 开屏·复活），均由 `config.js` 的 `SUPPORT` / `ADS` 驱动；当前线上为空配置降级态（不显示任何广告、不打断玩法），填配置后跑 `deploy.ps1` 生效（详见 §10）。
+H5 长按憋屎小游戏，**纯静态**（无构建步骤）。**2026-11-27 新增便池存档**：便池最多 5 坨、有 1~5 坨即可点「🚽 冲马桶」转入背包（满池高亮）；`ls_save_v1` 持久化 `bag/toilet`，刷新后屎堆原样恢复，旧 `ls_best` 迁移为背包起始值，云端按 ≤50 分段同步。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近提交见 git log（便池存档 + 冲马桶入袋已上线），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。变现：HUD 顶栏 💖「支持作者」打赏入口 + 三种内嵌广告位（底部 banner / 结算插屏 / 开屏·复活），均由 `config.js` 的 `SUPPORT` / `ADS` 驱动；当前线上为空配置降级态（不显示任何广告、不打断玩法），填配置后跑 `deploy.ps1` 生效（详见 §10）。
 
 ---
 
@@ -318,10 +318,11 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 **实现要点**：
 - `game.js` 状态：`TOILET_CAP=5`、`bag`、`toilet`、`SAVE_KEY='ls_save_v1'`；`loadSave()`/`persist()` 读写 `{v:1,bag,toilet}`，并镜像 `ls_best`。
 - `burst()`：满池直接 return（`pressOn()` 也拦并 toast）；正常一坨只 `toilet++`，不升等级、不解锁皮肤。
-- `flushToilet()`：`toilet<=0` 提示；把 `landed` 元素加 `.flushed` 播冲走动画，460ms 后 `clearLanded()`；`bag += toilet`、`toilet=0`、`persist()`、`scheduleSave()`，再统一处理升级/解锁/音效/震动/飘字。
+- `flushToilet()`：`toilet<=0` 提示；1~5 坨均可冲（`render()` 里 `fb.disabled = !has`，不再等满池）；把 `landed` 元素加 `.flushed` 播冲走动画，460ms 后 `clearLanded()`；`bag += toilet`、`toilet=0`、`persist()`、`scheduleSave()`，再统一处理升级/解锁/音效/震动/飘字。
 - 解锁判定改成 `oldBag < need && bag >= need`，避免冲水跨过整 5 时漏解锁。
 - 「重新开始」`doReset()` 只清便池，不动背包。
 - 刷新恢复：`spawnLandedPoop(..., instant=true)` 直接落位并加 `.instant` 关掉飞出动画；`restorePile()` 在启动 `loadSave()` 之后调用。
 - 云端 `best` 有单次增量 ≤50 的触发器，`syncBagToCloud()` 用 `pullBest` + `pushBest` 每轮最多 +50 分段追平（老档 300 分也能上云）；`scheduleSave()` 防抖后调它。登录/启动时云端值更高则覆盖本地，更低则反向分段同步。
 
-**验证**：`_verify_toilet.js`（临时脚本，验证后清理）真机 8 项全绿：初始态、5 坨入池、刷新保留 5 坨+落地堆、满池拦截、冲水后 bag=5/toilet=0、存档写入、再刷新保留、旧档 `ls_best=37` 迁移；0 pageerror + 0 consoleError。满池截图 `_toilet_full.png` 检查布局无溢出。
+**验证**：`_verify_toilet.js`（临时脚本，验证后清理）真机 8 项全绿：初始态、5 坨入池、刷新保留 5 坨+落地堆、满池拦截、冲水后 bag=5/toilet=0、存档写入、再刷新保留、旧档 `ls_best=37` 迁移；0 pageerror + 0 consoleError。后续改为「有 1~5 坨即可冲」，`_verify_partial.js` 真机 3/3 通过（3 坨未满时按钮可用且显示 +3、冲水后 bag=3、刷新保留）。`_verify_online.js` 线上 iframe 验证新 UI 生效（0 pageerror）。**已部署上线**（2026-11-27）。
+- **CLI 部署坑**：本机 PATH 没有 `tcb`，`deploy.ps1` 直接跑会报「无法识别 tcb」。可用 npm exec 调起 `@cloudbase/cli@3.9.5` 逐个执行 `hosting deploy`（需先把 Node 目录加入 PATH）；CLI 登录态有效，沙箱拦 `reg.exe` 不影响上传结果。
