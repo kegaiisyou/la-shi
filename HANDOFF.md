@@ -400,3 +400,16 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - `window.LS_AUTO_DEBUG` 是原型验证钩子（get/simulate/setInterval/setOfflineCap），正式版可删。
 
 **验证**：`_verify_auto.mjs` 真机 21/21 通过——默认开启、SVG 渲染、v3 存档、在线产出、满容器截断与停产、助手满状态、冲水恢复、离线 30 分钟只算 10 分钟（带上限提示）、刷新持久化、开关双向、0 pageerror / 0 consoleError。桌面 480×820 与手机 390×844 截图确认助手不遮挡主角和按钮。
+
+## 16. 离线归来结算卡 + 离线上限升级入口（2026-11-27）
+
+**需求**：离线归来给一张结算卡（离开多久 / 补了几坨 / 撞没撞上限），把「10 分钟上限」做成看得见的升级动机。
+
+**实现**：
+- `config.js` 加 `AUTO.OFFLINE_TIERS = [10分, 30分, 1小时, 4小时, 24小时]`，和容器升级一样测试期免费点。
+- `settleAuto()` 返回值扩展出 `awayMs`（真实离开时长）、`countedMs`（截断后实际补算）、`capMs`（结算当时的上限，供文案用）、`clipped`（被容量截断）。注意 `autoTick` 会每秒结算，`awayMs` 只有回前台/刷新那一次才有意义。
+- 新增 `#offlineOverlay` 结算卡：大号 `+N 坨`、离开/补算/上限三行、条件文案（撞上限 / 容量截断 / 容器满 / 正常）。卡内升级按钮直接改 `autoOfflineMs` 并 `persist()`，卡片原地刷新上限和下一档，不关闭。
+- 触发条件：离开 ≥60 秒且（有产出 or 撞上限 or 容器满）。启动在 `restorePile()` 后调 `maybeShowOfflineCard()`；`setInterval(autoTick, 1000)` 不弹卡；`visibilitychange` 回前台用 `autoTick(true)`（quiet，避免和卡片重复 toast/banner）再弹卡。
+- **踩坑**：`maybeShowOfflineCard()` 里必须 `render()`，否则补算后的 `toilet` 只写进存档，DOM 上冲水按钮还是旧的 `disabled` 状态（真机验证因此超时过一次）。
+
+**验证**：`_verify_offcard.mjs` 真机 22/22 通过——首屏不弹、撞 10 分钟上限文案与升级动机、卡内升级到 30 分钟并落档、下一档 1 小时、关闭/保持、2 小时只算 30 分钟、未撞上限提示、满容器停工说明、0 pageerror / 0 consoleError。桌面与手机截图确认卡片完整可读。

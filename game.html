@@ -307,6 +307,30 @@
     25%  { opacity: 1; }
     100% { opacity: 0; transform: translate(84px, 42px) scale(1.1) rotate(35deg); }
   }
+  /* ---------- 离线归来结算卡 ---------- */
+  .offline-card { text-align: center; }
+  .offline-hero {
+    font-size: 40px; font-weight: 900; line-height: 1.1; letter-spacing: -1px;
+    background: linear-gradient(180deg, #B8621C 0%, #8A4512 100%);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+    filter: drop-shadow(0 2px 0 rgba(255,255,255,.8)); margin: 2px 0 12px;
+  }
+  .offline-hero small { display: block; font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #A2855F; -webkit-text-fill-color: #A2855F; margin-top: 2px; }
+  .offline-rows { display: grid; gap: 6px; }
+  .offline-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 9px 11px; border-radius: 10px; font-size: 12.5px;
+    color: var(--ink2); background: #FFFDF9; border: 1px solid #F0DEC0;
+  }
+  .offline-row b { color: #7A4A22; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .offline-row.hit b { color: #B0521C; }
+  .cap-note {
+    font-size: 11.5px; line-height: 1.65; color: #8A6038;
+    background: rgba(233,163,60,.14); border-radius: 10px;
+    padding: 9px 11px; margin: 11px 0;
+  }
+  .cap-note.hit { background: rgba(214,105,45,.15); color: #9C4A1B; font-weight: 700; }
+  .offline-card #offUpgrade { margin-top: 2px; }
   .fx { position: absolute; inset: 0; pointer-events: none; z-index: 6; }
 
   /* ---------- 连击 ---------- */
@@ -751,6 +775,22 @@
     <div class="card-msg" id="authMsg"></div>
     <button id="authSubmit" class="primary">登录</button>
     <button id="authClose" class="close">取消</button>
+  </div>
+</div>
+
+<!-- 离线归来结算 -->
+<div class="overlay" id="offlineOverlay">
+  <div class="card offline-card">
+    <h2>💩 小屎崽代班结算</h2>
+    <div class="offline-hero" id="offMade">+0 坨<small>趁你不在挤的</small></div>
+    <div class="offline-rows">
+      <div class="offline-row"><span>离开时长</span><b id="offAway">—</b></div>
+      <div class="offline-row"><span>实际补算</span><b id="offCounted">—</b></div>
+      <div class="offline-row" id="offCapRow"><span>离线上限</span><b id="offCap">10 分钟</b></div>
+    </div>
+    <div class="cap-note" id="offNote"></div>
+    <button id="offUpgrade" class="primary">⬆️ 升级离线时长</button>
+    <button id="offClose" class="close">收下这些屎</button>
   </div>
 </div>
 

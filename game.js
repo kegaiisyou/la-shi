@@ -200,10 +200,14 @@
   function settleAuto() {
     var now = Date.now(), elapsed = now - lastAutoAt;
     if (!isFinite(elapsed) || elapsed < 0) { elapsed = 0; lastAutoAt = now; }  /* 用户改过系统时间 */
+    var awayMs = elapsed;                 /* 真实离开时长，结算卡要用 */
     var clamped = elapsed > autoOfflineMs;
     if (clamped) elapsed = autoOfflineMs;
     var room = Math.max(0, currentVessel().cap - toilet);
-    if (!autoOn || room === 0) { lastAutoAt = now; return { made: 0, clamped: false, full: true }; }
+    if (!autoOn || room === 0) {
+      lastAutoAt = now;
+      return { made: 0, clamped: false, full: true, clipped: false, awayMs: awayMs, countedMs: 0, capMs: autoOfflineMs };
+    }
     var n = Math.floor(elapsed / autoIntervalMs), made = Math.min(n, room);
     if (made > 0) {
       toilet += made;
@@ -213,27 +217,96 @@
     } else if (clamped) {
       lastAutoAt = now - (elapsed % autoIntervalMs);
     }
-    return { made: made, clamped: clamped, full: false };
+    return { made: made, clamped: clamped, full: false, clipped: made < n, awayMs: awayMs, countedMs: elapsed, capMs: autoOfflineMs };
   }
   function autoMsg(res) {
     return '小屎崽趁你不在挤了 ' + res.made + ' 坨' +
       (res.clamped ? '（离线最多 ' + Math.round(autoOfflineMs / 60000) + ' 分钟）' : '');
   }
-  function applyAuto(res) {
+  function applyAuto(res, quiet) {
     if (!res.made) { updateHelper(); return; }
     helperPop(res.made > 1 ? '💪' : '💩');
     if (res.made > 1) {
       clearLanded(); restorePile();
-      toast(autoMsg(res));
-      banner('小屎崽代班 · +' + res.made);
-      var rc = anchor(); ring(rc.x, rc.y + 10, 20, 'rgba(255,205,120,.95)', 6, 420, 1);
+      if (!quiet) {
+        toast(autoMsg(res));
+        banner('小屎崽代班 · +' + res.made);
+        var rc = anchor(); ring(rc.x, rc.y + 10, 20, 'rgba(255,205,120,.95)', 6, 420, 1);
+      }
     } else {
       setTimeout(function () { spawnLandedPoop(skinById(curSkin), 0, 0, false); render(); }, 300);
-      toast('小屎崽帮你挤了 1 坨');
+      if (!quiet) toast('小屎崽帮你挤了 1 坨');
     }
     render();
   }
-  function autoTick() { applyAuto(settleAuto()); }
+  function autoTick(quiet) { var res = settleAuto(); applyAuto(res, quiet); return res; }
+
+  /* ---- 离线归来结算卡：时长 / 产量 / 是否撞上限 / 可见的升级入口 ---- */
+  var lastOfflineRes = null;
+  function fmtAway(ms) {
+    var s = Math.floor(Math.max(0, ms) / 1000), h = Math.floor(s / 3600);
+    var m = Math.floor((s % 3600) / 60), sec = s % 60;
+    if (h > 0) return h + ' 小时 ' + m + ' 分';
+    if (m > 0) return m + ' 分 ' + sec + ' 秒';
+    return sec + ' 秒';
+  }
+  function fmtCap(ms) {
+    var m = Math.round(ms / 60000);
+    if (m >= 60) return (Math.round(m / 6) / 10) + ' 小时';
+    return m + ' 分钟';
+  }
+  function nextOfflineTier() {
+    for (var i = 0; i < OFFLINE_TIERS.length; i++) if (OFFLINE_TIERS[i] > autoOfflineMs) return OFFLINE_TIERS[i];
+    return 0;
+  }
+  function renderOfflineCard() {
+    var res = lastOfflineRes; if (!res) return;
+    var oldCap = res.capMs || autoOfflineMs;
+    $('offMade').innerHTML = '+' + res.made + ' 坨<small>' +
+      (res.made ? '趁你不在挤的' : (res.full ? '容器满了，小屎崽停工' : '还没到一坨的时间')) + '</small>';
+    $('offAway').textContent = fmtAway(res.awayMs);
+    $('offCounted').textContent = fmtAway(res.countedMs) + (res.clamped ? '（截断）' : '');
+    $('offCap').textContent = fmtCap(autoOfflineMs);
+    $('offCapRow').classList.toggle('hit', !!res.clamped);
+    var note;
+    if (res.clamped) {
+      note = '⚠️ 撞到' + fmtCap(oldCap) + '上限：离开' + fmtAway(res.awayMs) +
+        '，多出来的' + fmtAway(res.awayMs - oldCap) + '没算。升级后这段也能补回来。';
+    } else if (res.clipped) {
+      note = '✅ 时间全算到了，不过容器先装满了。冲水后小屎崽继续开工。';
+    } else if (res.full) {
+      note = '🚽 容器是满的，这段时间小屎崽没地方放，先冲水再来吧。';
+    } else {
+      note = '✅ 没撞上限，离开的这段时间全算进去了。';
+    }
+    $('offNote').textContent = note;
+    $('offNote').classList.toggle('hit', !!res.clamped);
+    var next = nextOfflineTier(), btn = $('offUpgrade');
+    if (next) {
+      btn.disabled = false;
+      btn.textContent = '⬆️ 升级离线时长 → ' + fmtCap(next) + '（测试期免费）';
+    } else {
+      btn.disabled = true;
+      btn.textContent = '✅ 离线上限已达最高档 ' + fmtCap(autoOfflineMs);
+    }
+  }
+  function maybeShowOfflineCard(res) {
+    if (!res || !autoOn) return;
+    var away = res.awayMs || 0;
+    if (away < 60000 || !(res.made > 0 || res.clamped || res.full)) return;
+    lastOfflineRes = res;
+    render(); renderOfflineCard();   /* 补算后的容器数字要先刷，否则按钮还是旧状态 */
+    setTimeout(function () { $('offlineOverlay').classList.add('show'); }, 460);
+  }
+  $('offClose').onclick = function () { $('offlineOverlay').classList.remove('show'); };
+  $('offlineOverlay').addEventListener('click', function (e) { if (e.target === this) $('offClose').click(); });
+  $('offUpgrade').onclick = function () {
+    var next = nextOfflineTier();
+    if (!next) return;
+    autoOfflineMs = next;
+    persist(); render(); renderOfflineCard();
+    sfxUnlock(); toast('离线上限已升级到 ' + fmtCap(autoOfflineMs));
+  };
 
   /* 一坨飞走后，原地回到初始种子状态，等待玩家重新捏下一坨 */
   function resetToSeed() {
@@ -276,6 +349,8 @@
   function cfgNum(v, d, lo, hi) { v = Number(v); if (!isFinite(v)) return d; return Math.max(lo, Math.min(hi, v)); }
   var autoIntervalMs = cfgNum(AUTO.INTERVAL_MS, 120000, 1000, 86400000);
   var autoOfflineMs  = cfgNum(AUTO.OFFLINE_CAP_MS, 600000, 0, 604800000);
+  var OFFLINE_TIERS = (AUTO.OFFLINE_TIERS && AUTO.OFFLINE_TIERS.length ? AUTO.OFFLINE_TIERS : [600000, 1800000, 3600000, 14400000, 86400000])
+    .map(function (v) { return cfgNum(v, 600000, 0, 604800000); }).sort(function (a, b) { return a - b; });
   var autoOn = AUTO.ENABLED !== false;
   var lastAutoAt = Date.now();          /* 上次结算的墙钟时刻 */
   function need(n) { return 10 * n * n; }
@@ -428,7 +503,7 @@
   document.addEventListener('visibilitychange', function () {
     pageHidden = document.hidden;
     lastT = 0;
-    if (!document.hidden) autoTick();   /* 回到前台：按墙钟补算，不依赖被暂停的 rAF */
+    if (!document.hidden) maybeShowOfflineCard(autoTick(true));   /* 回前台：补算 + 弹结算卡，不靠被暂停的 rAF */
   });
 
   /* 四段软体骨架：越往上弹簧越软、迟滞越大 → 形变像波一样从堆底传到尖 */
@@ -1253,10 +1328,8 @@
   loadSave();
   var offlineRes = settleAuto();        /* 离线补算：先算再摆屎堆，视觉直接是最终状态 */
   restorePile();
-  if (offlineRes.made > 0) {
-    helperPop('💪');
-    setTimeout(function () { toast(autoMsg(offlineRes)); banner('小屎崽代班 · +' + offlineRes.made); }, 480);
-  }
+  if (offlineRes.made > 0) helperPop('💪');
+  maybeShowOfflineCard(offlineRes);   /* 离线归来：结算卡统一交代时长/产量/上限 */
   $('autoToggle').addEventListener('click', function () {
     autoOn = !autoOn;
     lastAutoAt = Date.now();
@@ -1294,7 +1367,11 @@
       var res = settleAuto(); applyAuto(res); return res;
     },
     setInterval: function (ms) { autoIntervalMs = cfgNum(ms, 120000, 1000, 86400000); render(); },
-    setOfflineCap: function (ms) { autoOfflineMs = cfgNum(ms, 600000, 0, 604800000); persist(); render(); }
+    setOfflineCap: function (ms) { autoOfflineMs = cfgNum(ms, 600000, 0, 604800000); persist(); render(); },
+    offlineCard: function (ms) {
+      lastAutoAt -= Math.max(0, Number(ms) || 0);
+      var res = settleAuto(); maybeShowOfflineCard(res); return res;
+    }
   };
   bootCloud();
   best = bag;
