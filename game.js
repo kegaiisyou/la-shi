@@ -1108,7 +1108,7 @@
       var t = performance.now();
       if (t - syncFailTip > 3000) {
         syncFailTip = t;
-        toast('云端同步失败，请确认已登录且用原设备');
+        toast('云端同步失败，请退出后重新登录绑定设备');
       }
     }
     window.CloudAuth.pullBest(me.user).then(function (b) {
@@ -1203,7 +1203,7 @@
       if (authMode === 'reg') { setAuthMode('login'); return; }
       $('authOverlay').classList.remove('show');
       refreshUser();
-      toast('欢迎回来，' + (res.me ? res.me.nickname : ''));
+      toast(res.bound === false ? '登录成功 · 设备绑定失败' : '欢迎回来，' + (res.me ? res.me.nickname : ''));
       if (res.me && cloudOn) {
         window.CloudAuth.pullBest(res.me.user).then(function (b) {
           if (b > bag) { bag = b; best = bag; persist(); render(); renderSkins(); }

@@ -117,7 +117,9 @@
         if (h !== rec.pass) return { ok: false, msg: '密码错误' };
         var me = { user: u, nickname: rec.nickname || u };
         try { localStorage.setItem('ls_me', JSON.stringify(me)); } catch (e) {}
-        return { ok: true, msg: '登录成功', me: me };
+        return claimDevice(u, password).then(function (bound) {
+          return { ok: true, msg: '登录成功', me: me, bound: bound };
+        });
       });
     }).catch(function (e) { return { ok: false, msg: errMsg(e) }; });
   }
@@ -130,9 +132,10 @@
   }
 
   function pullBest(username) {
-    if (!cloud) return Promise.resolve(0);
+    var u = sanitize(username);
+    if (!cloud || !u) return Promise.resolve(0);
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('best').eq('username', username));
+      return send(db.from(CFG.TABLE).select('best').eq('username', u));
     }).then(function (res) {
       return (res.data && res.data[0] && res.data[0].best) || 0;
     }).catch(function () { return 0; });
@@ -140,10 +143,10 @@
 
   /* 把云端分数对齐到本地值（可升可降）；RLS 只允许改自己那行 */
   function setBest(username, value) {
-    var v = Math.max(0, Math.floor(Number(value) || 0));
-    if (!cloud || !username) return Promise.resolve(false);
+    var v = Math.max(0, Math.floor(Number(value) || 0)), u = sanitize(username);
+    if (!cloud || !u) return Promise.resolve(false);
     return ensureAuth().then(function () {
-      return send(db.from(CFG.TABLE).select('id').eq('username', username));
+      return send(db.from(CFG.TABLE).select('id').eq('username', u));
     }).then(function (res) {
       var rec = res.data && res.data[0];
       if (!rec) return false;
@@ -155,6 +158,16 @@
     }).catch(function () { return false; });
   }
   function pushBest(username, best) { return setBest(username, best); }
+
+  /* 换设备后登录：服务端用密码校验身份，把账号重新绑到当前匿名 uid */
+  function claimDevice(username, password) {
+    var u = sanitize(username);
+    if (!cloud || !u) return Promise.resolve(false);
+    return ensureAuth().then(function () {
+      return send(db.rpc('ls_claim_device', { p_username: u, p_password: String(password || '') }));
+    }).then(function (res) { return !!(res && res.data === true); })
+      .catch(function () { return false; });
+  }
 
   /* 重置账号分数：排行榜按 best 排序，清成 0 即从榜上消失 */
   function resetBest(username) { return setBest(username, 0); }
@@ -174,6 +187,7 @@
   window.CloudAuth = {
     init: init, isCloud: function () { return cloud; },
     register: register, login: login, logout: logout, me: me,
-    pullBest: pullBest, pushBest: pushBest, setBest: setBest, resetBest: resetBest, ranking: ranking
+    pullBest: pullBest, pushBest: pushBest, setBest: setBest, resetBest: resetBest,
+    claimDevice: claimDevice, ranking: ranking
   };
 })();

@@ -451,3 +451,23 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 **卡片极简**：标题「欢迎回来」，去掉「实际补算 / 离线上限 / 上限提示文案」三块，只留「离开时长」和「+N 坨（这次离线收获）」；升级按钮 `display:none` 默认隐藏，**只有 `res.clamped` 撞上限时才露出**，兼顾之前要的升级动机。
 
 **验证**：`_verify_sync_card.mjs` 真机 13/13 通过——标题/收益/时长/单行信息/无多余说明、未撞上限隐藏升级、撞上限显示升级、云端高于本地拉回 12、本地为 0 清零云端旧值、本地高于云端推到 25、0 pageerror / 0 consoleError。截图确认卡片清爽。
+
+## 20. 跨设备账号：服务端校验密码重绑（2026-11-27）
+
+**用户选择**：方案 2「跨设备账号」。原设计把 `anon_uid` 绑死在首次注册设备，换手机后只能本地玩。
+
+**先排除的路**：
+- SDK 3.11.2（`cloudbase.full.js`）有 `signInWithUsernameAndPassword` / `signUpWithEmailAndPassword`，但**没有** `signUpWithUsernameAndPassword`。
+- 尝试用 `auth.currentUser.updateUsername()` 或 `updateEmail(email, pass)` 把匿名账号转正，均被拒：`PERMISSION_DENIED user scope want [user profile:w], but got [anonymous]` / `匿名用户不支持修改`。当前环境没开匿名升级和内建账号注册入口，无法从客户端安全迁移。
+- 云函数旁已被平台拒权，不能做服务端注册代理。
+
+**最终方案（等效于跨设备）**：保留自建账号表与用户名密码，新增服务端重绑函数。
+- `CREATE EXTENSION IF NOT EXISTS pgcrypto;` 后用 `encode(digest(salt || '|' || password,'sha256'),'hex')` 在数据库里校验密码（客户端只传明文密码给 RPC，不传哈希，避免直接拿库里的哈希伪造）。
+- `public.ls_claim_device(p_username,p_password) RETURNS bool SECURITY DEFINER`：校验 `auth.uid()` 非空 → 查用户 → 校验密码哈希 → `UPDATE anon_uid = auth.uid()`。只 GRANT 给 anon/authenticated。
+- `ls_users_guard()` 删掉 `anon_uid immutable` 限制（正常 UPDATE 仍受 RLS `anon_uid=auth.uid()` 约束，不能改别人的 uid），保留非负校验。
+- `cloud.js` 新增 `claimDevice()` 调 `db.rpc('ls_claim_device',...)`；`login()` 密码校验成功后自动重绑，返回 `bound` 字段。顺手修了 `setBest/pullBest` 没 `sanitize(username)` 导致超 20 字符用户名查不到行的 bug。
+- `game.js` 登录后 toast 显示「设备绑定失败」（若失败），同步失败提示改成「退出后重新登录绑定设备」。
+
+**用户操作**：新设备打开游戏 → 点「退出」（如果已登录旧态）→ 用原来的用户名密码登录一次 → 自动重绑，之后分数正常同步。
+
+**验证**：`_verify_claim.mjs` 真机 9/9 通过——设备 A 注册并写 42、设备 B（全新匿名身份）登录自动重绑、B 读到 42 并写 77、A 读到 77、错误密码重绑失败、0 pageerror。验证后清理了测试账号行。
