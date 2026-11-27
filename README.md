@@ -23,6 +23,29 @@ H5 长按憋屎小游戏。按住 💩 蓄力、憋满一格掉一坨计分；�
 - 防批量注册：注册时把当前匿名登录 uid（JWT `sub`）写入 `anon_uid` 列，唯一索引保证**一个设备身份只能注册一个账号**
 - 分数保护：RLS 行级隔离（anon 只能更新自己 `anon_uid = auth.uid()` 的那一行）+ 触发器限制单次提交增量 ≤50、`anon_uid` 绑定后不可改
 
+## 支持作者（打赏入口）
+
+游戏内 HUD 右上角 💖 可打开支持面板。个人无执照方案，不接广告联盟，走爱发电 / 微信 / 支付宝收款码。
+
+在 `config.js` 的 `SUPPORT` 中填写：
+
+- `AFDIAN`：爱发电主页链接（个人可开，无需执照）
+- `WECHAT_QR` / `ALIPAY_QR`：收款码图片，可填完整 URL 或 `data:image/png;base64,...`（后者改完跑 `deploy.ps1` 即可，无需单独传图）
+- `ENABLED: false` 可隐藏入口
+
+填完跑一次 `powershell -ExecutionPolicy Bypass -File deploy.ps1` 上线。留空时面板显示「把游戏分享给朋友」的降级文案，不会报错。
+
+## 内嵌广告位
+
+游戏内预留三种自建广告位，全部在 `config.js` 的 `ADS` 里配「图片 + 链接 + 文案」，留空就不显示，不影响玩法：
+
+- `BANNER`：footer 底部常驻 banner
+- `INTERSTITIAL.EVERY`：每 N 次爆屎弹一次插屏（0=关闭）
+- `OPEN`：开屏广告，`ONCE_PER_SESSION` 控制同一会话只弹一次
+- `REVIVE`：点「重新开始」时先弹广告，关掉后才真正重置
+
+每个位填 `IMAGE`（URL 或 base64）才生效，`LINK` 是点击跳转，`CLOSE_TEXT` 是关闭按钮文案。个人无执照不接广告联盟，这些位可用来推自己的产品或接商单。
+
 ## 文件结构
 
 | 文件 | 作用 |

@@ -682,6 +682,12 @@
 
     /* 计分 */
     score++;
+    if (ADS.INTERSTITIAL && ADS.INTERSTITIAL.EVERY > 0) {
+      adBurstCount++;
+      if (adBurstCount % ADS.INTERSTITIAL.EVERY === 0) {
+        setTimeout(function () { showAd(ADS.INTERSTITIAL, '跳过'); }, 380);
+      }
+    }
     $('score').classList.remove('bump'); void $('score').offsetWidth;
     $('score').classList.add('bump');
 
@@ -730,13 +736,17 @@
   });
   poop.addEventListener('contextmenu', function (e) { e.preventDefault(); });
 
-  $('reset').addEventListener('click', function () {
+  function doReset() {
     score = 0; lv = 1; combo = 0; pile = 0; drop = 0; pq = 0; pressing = false;
     T.forEach(function (t) { t.oy = 0; t.vo = 0; t.sq = 1; t.vs = 0; t.lx = 0; t.vl = 0; t.rot = 0; t.vr = 0; });
     comboEl.classList.remove('on', 'hot', 'blaze');
     clearLanded();
     render();
     toast('已重新开始');
+  }
+  $('reset').addEventListener('click', function () {
+    if (adValid(ADS.REVIVE)) { adAfterClose = doReset; showAd(ADS.REVIVE, '继续游戏'); }
+    else doReset();
   });
 
   /* ============================================================
@@ -897,6 +907,73 @@
   $('rankOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
 
   /* ============================================================
+     12.5 支持作者（打赏入口：配置来自 config.js 的 SUPPORT）
+     ============================================================ */
+  var SUP = (window.LS_CONFIG && window.LS_CONFIG.SUPPORT) || {};
+  function supEsc(s) {
+    return String(s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+  var supBtn = $('supportBtn');
+  if (supBtn && SUP.ENABLED === false) supBtn.style.display = 'none';
+  if (supBtn) supBtn.onclick = function () {
+    var html = '';
+    if (SUP.AFDIAN) {
+      html += '<a class="support-main" href="' + supEsc(SUP.AFDIAN) + '" target="_blank" rel="noopener">🙏 去爱发电支持作者</a>';
+    }
+    var qrs = '';
+    if (SUP.WECHAT_QR) {
+      qrs += '<div class="support-qr"><img src="' + supEsc(SUP.WECHAT_QR) + '" alt="微信收款码"><b>微信</b><small>长按保存 / 截图扫码</small></div>';
+    }
+    if (SUP.ALIPAY_QR) {
+      qrs += '<div class="support-qr"><img src="' + supEsc(SUP.ALIPAY_QR) + '" alt="支付宝收款码"><b>支付宝</b><small>长按保存 / 截图扫码</small></div>';
+    }
+    if (qrs) html += '<div class="support-qrs">' + qrs + '</div>';
+    if (!html) html = '<div class="support-empty">作者还没设置收款方式～<br>把游戏分享给朋友，就是最大的支持！</div>';
+    $('supportNote').textContent = SUP.NOTE || '如果玩得开心，欢迎支持一下作者～';
+    $('supportBody').innerHTML = html;
+    $('supportOverlay').classList.add('show');
+  };
+  $('supportClose').onclick = function () { $('supportOverlay').classList.remove('show'); };
+  $('supportOverlay').addEventListener('click', function (e) { if (e.target === this) this.classList.remove('show'); });
+
+  /* ============================================================
+     12.6 内嵌广告位（配置来自 config.js 的 ADS）
+     ============================================================ */
+  var ADS = (window.LS_CONFIG && window.LS_CONFIG.ADS) || {};
+  var adBurstCount = 0, adAfterClose = null;
+  var AD_OPEN_KEY = 'ls_ad_open_shown';
+  function adValid(cfg) { return ADS.ENABLED !== false && !!(cfg && cfg.IMAGE); }
+  function adDismiss() {
+    $('adOverlay').classList.remove('show');
+    var f = adAfterClose; adAfterClose = null;
+    if (f) f();
+  }
+  function showAd(cfg, fallbackClose) {
+    if (!adValid(cfg) || $('adOverlay').classList.contains('show')) return false;
+    $('adTitle').textContent = cfg.TITLE || '赞助';
+    $('adText').textContent = cfg.TEXT || '';
+    var img = $('adImg');
+    img.onerror = function () { this.style.display = 'none'; };
+    img.style.display = ''; img.src = cfg.IMAGE;
+    var link = $('adLink');
+    if (cfg.LINK) { link.href = supEsc(cfg.LINK); link.setAttribute('target', '_blank'); link.setAttribute('rel', 'noopener'); }
+    else { link.removeAttribute('href'); link.removeAttribute('target'); }
+    $('adClose').textContent = cfg.CLOSE_TEXT || fallbackClose || '跳过';
+    $('adOverlay').classList.add('show');
+    return true;
+  }
+  $('adClose').onclick = adDismiss;
+  $('adOverlay').addEventListener('click', function (e) { if (e.target === this) adDismiss(); });
+  (function () {
+    var el = $('adBanner'), cfg = ADS.BANNER;
+    if (!adValid(cfg)) { el.style.display = 'none'; return; }
+    el.innerHTML = '<img src="' + supEsc(cfg.IMAGE) + '" alt="广告">' +
+      (cfg.TEXT ? '<span class="ab-text">' + supEsc(cfg.TEXT) + '</span>' : '');
+    if (cfg.LINK) { el.href = supEsc(cfg.LINK); el.setAttribute('target', '_blank'); el.setAttribute('rel', 'noopener'); }
+    el.style.display = 'block';
+  })();
+
+  /* ============================================================
      13. 启动
      ============================================================ */
   /* 手机长按不选中文字 / 不弹 iOS 菜单（输入框除外） */
@@ -934,4 +1011,15 @@
   window.addEventListener('cloudbase-ready', bootCloud);
   /* 事件可能在监听注册前触发，用标志兜底 */
   if (window.__sdkReady || typeof window.cloudbase !== 'undefined') bootCloud();
+  /* 开屏广告：会话内只弹一次，不阻塞首屏 */
+  if (adValid(ADS.OPEN)) {
+    var showOpen = true;
+    if (ADS.OPEN.ONCE_PER_SESSION !== false) {
+      try { showOpen = sessionStorage.getItem(AD_OPEN_KEY) !== '1'; } catch (e) {}
+    }
+    if (showOpen) {
+      try { sessionStorage.setItem(AD_OPEN_KEY, '1'); } catch (e) {}
+      setTimeout(function () { showAd(ADS.OPEN, '跳过'); }, 600);
+    }
+  }
 })();

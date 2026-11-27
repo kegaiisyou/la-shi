@@ -7,7 +7,7 @@
 
 ## 0. 一句话现状
 
-H5 长按憋屎小游戏，**纯静态**（无构建步骤）。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近一次提交 `913ff9d`（2026-11-26），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。
+H5 长按憋屎小游戏，**纯静态**（无构建步骤）。线上双地址：短地址 `github.io`（iframe 包装）→ 内嵌 CloudBase 静态托管的游戏本体。账号系统走 CloudBase PG 模式。最近一次提交 `913ff9d`（2026-11-26），玩法为「按住蓄力、捏满一坨即飞出落进地上的屎堆、计 1 分、松手退回」。飞出的屎是与角色完全相同的造型（带脸/皮肤/眨眼），走 JS 真抛物线 + 挤压弹射（duang）+ 粒子爆发，飞出瞬间带惊奇脸（charge 320ms），原坨立即清空回种子态。屎堆最多 20 坨，重置清空。变现：HUD 顶栏 💖「支持作者」打赏入口 + 三种内嵌广告位（底部 banner / 结算插屏 / 开屏·复活），均由 `config.js` 的 `SUPPORT` / `ADS` 驱动；当前线上为空配置降级态（不显示任何广告、不打断玩法），填配置后跑 `deploy.ps1` 生效（详见 §10）。
 
 ---
 
@@ -59,7 +59,7 @@ H5 长按憋屎小游戏，**纯静态**（无构建步骤）。线上双地址�
 ├── game.html         # 游戏本体结构：CSS + SVG 角色模板 + DOM 骨架（无内联 JS）
 ├── game.js           # 全部游戏逻辑：弹簧物理/粒子/音效/皮肤/账号 UI/长按蓄力
 ├── cloud.js          # CloudBase 账号层：匿名登录 + rdb（Supabase 风格）读写 ls_users
-├── config.js         # ENV / TABLE / SAVE_DEBOUNCE_MS
+├── config.js         # ENV / TABLE / SAVE_DEBOUNCE_MS / SUPPORT（打赏）/ ADS（广告位）
 ├── deploy.ps1        # 一键部署脚本：上传 4 文件到 CloudBase 静态托管
 ├── README.md         # 面向用户的说明
 └── HANDOFF.md        # 本文档（面向 AI）
@@ -228,6 +228,7 @@ c5ea92e feat: Q弹点击动画 + 7 款皮肤（按最高分解锁）
 db332e7 feat: 添加一键部署脚本 deploy.ps1 并更新文档
 ```
 
+（未提交）feat: 打赏入口 💖「支持作者」+ 三种内嵌广告位（config.js SUPPORT / ADS 驱动）
 更早：iframe 包装、CloudBase PG 适配、username 列名修复等（见 `git log`）。
 
 **美术来源**：`game.html` 的 SVG 角色与多轮视觉迭代由「豆包」完成；接入/修复/部署由本 AI 完成。后续美术协作可继续让豆包改 `game.html` 的 SVG/CSS，但**改完必须走 §4 验证+部署+推送流程**。
@@ -277,3 +278,28 @@ CREATE POLICY ls_update ON public.ls_users FOR UPDATE TO authenticated
 - 临时文件 `cloudbaserc.json` / `functions/` 及 `_*.py`/`_*.js` 探针在收尾时清理。
 
 **最后更新**：2026-11-26（RLS 行级隔离根治刷榜）
+
+---
+
+## 10. 打赏 / 赞助入口 + 内嵌广告位（2026-11-26）
+
+个人无执照方案，**不接广告联盟**（资质+备案+流量门槛高，单页 H5 收益低），走爱发电 / 微信 / 支付宝收款码。
+
+- 入口：`game.html` HUD 顶栏 `.hud-acts` 内的 `#supportBtn`（💖）；面板 `#supportOverlay`。
+- 配置：`config.js` 的 `SUPPORT = { ENABLED, AFDIAN, WECHAT_QR, ALIPAY_QR, NOTE }`。
+  - `AFDIAN`：爱发电主页链接（个人可开，无需执照）。
+  - `WECHAT_QR` / `ALIPAY_QR`：收款码图片，可填完整 URL 或 `data:image/png;base64,...`（**base64 写法无需额外传图**，改完跑 `deploy.ps1` 即可）。
+  - `ENABLED: false` 完全隐藏入口；全部留空时面板显示「分享给朋友」降级文案，不报错。
+- 逻辑：`game.js` 第 12.5 节读 `window.LS_CONFIG.SUPPORT` 动态渲染；`supEsc()` 做属性转义；关闭按钮 + 点遮罩均可用。
+- 部署：改 `config.js` 后必须跑 `deploy.ps1`（它会上载 config.js 到云端）。
+- 验证：`_verify_support.js`（已清理）真机覆盖空配置 / 有配置 / 两种关闭 / 皮肤面板回归，0 pageerror + 0 consoleError；线上 iframe 同样通过。
+
+### 内嵌广告位（`config.js` 的 `ADS`）
+
+同样走个人无执照方案：**不接广告联盟**（资质/备案/iframe/流量门槛），自建广告位，图片+链接配置化，留空完全不显示。
+
+- 四种配置：`BANNER`（footer 底部常驻矮条）、`INTERSTITIAL.EVERY`（每 N 次爆屎弹一次插屏，0=关闭）、`OPEN`（开屏，`ONCE_PER_SESSION` 会话去重）、`REVIVE`（点「重新开始」时先弹，关掉才真正重置）。
+- 每个位填 `IMAGE` 才生效；`LINK` 点击跳转、`TEXT` 文案、`TITLE` 标题、`CLOSE_TEXT` 关闭按钮文案。
+- 插屏/开屏/复活共用 `#adOverlay` 动态渲染；`#adClose` 和点遮罩都可关闭。复活广告的关闭回调 `adAfterClose` 执行真正的 `doReset()`，所以分数在广告关掉前保持不变。
+- `adBurstCount` 在 `burst()` 的 `score++` 后累加；`ADS.ENABLED:false` 或 `IMAGE` 留空时全部不生效，玩法零影响。
+- 验证：`_verify_ads.js`（已清理）真机覆盖空配置降级 / banner 渲染 / 插屏触发与关闭 / 复活拦截与重置 / 开屏会话去重 / 皮肤与打赏回归，0 pageerror + 0 consoleError。

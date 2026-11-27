@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拉屎大作战 游戏测评报告</title>
+<style>
+  :root{
+    --bg:#f5f6f8; --card:#ffffff; --text:#1f2328; --muted:#656d76;
+    --border:#e3e6ea; --grid:#dfe3e8; --accent:#e8590c; --accent-soft:#fff4ec;
+    --pro:#2f9e44; --con:#e03131; --chip:#eef1f4;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; padding:32px 16px 64px; background:var(--bg); color:var(--text);
+    font-family:"PingFang SC","Microsoft YaHei","Hiragino Sans GB","Source Han Sans SC",system-ui,-apple-system,"Segoe UI",sans-serif;
+    line-height:1.75; font-size:15px;
+  }
+  .wrap{max-width:960px;margin:0 auto;}
+  header.top{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:28px 32px; margin-bottom:20px;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+  .chip{
+    background:var(--chip); color:var(--muted); font-size:12px; padding:3px 10px;
+    border-radius:999px; letter-spacing:.02em;
+  }
+  .chip.accent{background:var(--accent-soft); color:var(--accent); font-weight:600;}
+  h1.title{margin:0 0 6px; font-size:30px; line-height:1.3; letter-spacing:-.01em;}
+  .subtitle{color:var(--muted); font-size:14px; margin:0 0 18px;}
+  .verdict{
+    border-left:4px solid var(--accent); background:var(--accent-soft);
+    padding:14px 18px; border-radius:0 8px 8px 0; font-size:17px; font-weight:600;
+  }
+  .panel{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:28px 32px; margin-bottom:20px;
+  }
+  .score-grid{display:flex;gap:32px;align-items:center;flex-wrap:wrap;}
+  .score-box{flex:0 0 auto;text-align:center;min-width:150px;}
+  .score-num{font-size:64px;font-weight:800;line-height:1;color:var(--accent);letter-spacing:-.03em;}
+  .score-den{font-size:14px;color:var(--muted);margin-top:2px;}
+  .tag{
+    display:inline-block;margin-top:12px;padding:5px 16px;border-radius:999px;
+    font-size:14px;font-weight:700;color:#fff;background:var(--accent);
+  }
+  .t-s{background:#c2255c;} .t-a{background:#e8590c;} .t-b{background:#f08c00;}
+  .t-c{background:#868e96;} .t-d{background:#adb5bd;} .t-f{background:#343a40;}
+  .radar{flex:0 0 auto;width:340px;max-width:100%;height:auto;}
+  .radar-label{font-size:13px;fill:var(--text);}
+  .radar-val{font-weight:700;fill:var(--accent);}
+  .radar-tick{font-size:9px;fill:#b0b7bf;}
+  .bars{flex:1 1 240px;min-width:240px;}
+  .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:9px;}
+  .bar-name{flex:0 0 68px;font-size:13px;color:var(--muted);}
+  .bar-track{
+    flex:1 1 auto;height:8px;background:var(--grid);border-radius:999px;overflow:hidden;
+  }
+  .bar-track i{display:block;height:100%;background:var(--accent);border-radius:999px;}
+  .bar-track.small{height:7px;flex:1 1 auto;max-width:200px;}
+  .bar-val{flex:0 0 30px;text-align:right;font-weight:700;font-size:14px;}
+  .notice{
+    background:#fff9db;border:1px solid #ffe066;border-radius:10px;padding:14px 18px;margin-bottom:20px;
+    font-size:14px;
+  }
+  .notice strong{display:block;margin-bottom:6px;color:#8a6d00;}
+  .notice ul{margin:0;padding-left:20px;}
+  h2.sec{
+    font-size:20px;margin:0 0 16px;padding-bottom:10px;border-bottom:2px solid var(--border);
+  }
+  .two{display:flex;gap:24px;flex-wrap:wrap;}
+  .two>div{flex:1 1 300px;min-width:280px;}
+  ul.pros,ul.cons{list-style:none;padding:0;margin:0;}
+  ul.pros li,ul.cons li{position:relative;padding-left:22px;margin-bottom:10px;}
+  ul.pros li::before{
+    content:"+";position:absolute;left:0;top:-1px;color:var(--pro);font-weight:800;font-size:16px;
+  }
+  ul.cons li::before{
+    content:"−";position:absolute;left:0;top:-1px;color:var(--con);font-weight:800;font-size:16px;
+  }
+  .subhead{font-size:15px;font-weight:700;margin:0 0 10px;}
+  .aud{display:flex;gap:24px;flex-wrap:wrap;}
+  .aud-col{flex:1 1 300px;min-width:280px;}
+  .aud-col h4{margin:0 0 10px;font-size:15px;color:var(--muted);font-weight:700;}
+  section.dim{border-top:1px dashed var(--border);padding:18px 0;}
+  section.dim:first-of-type{border-top:none;padding-top:0;}
+  section.dim header{display:flex;align-items:center;gap:12px;margin-bottom:8px;flex-wrap:wrap;}
+  section.dim h3{margin:0;font-size:17px;flex:0 0 auto;}
+  .dim-score{font-weight:800;color:var(--accent);font-size:16px;}
+  section.dim p{margin:0 0 10px;}
+  section.extra{margin-bottom:18px;}
+  section.extra h3{font-size:17px;margin:0 0 8px;}
+  .advice{
+    background:var(--card);border:1px solid var(--border);border-left:5px solid var(--accent);
+    border-radius:12px;padding:22px 28px;margin-bottom:20px;
+  }
+  .advice .lvl{font-size:22px;font-weight:800;color:var(--accent);margin-bottom:8px;}
+  table.src{width:100%;border-collapse:collapse;font-size:14px;}
+  table.src th,table.src td{border-bottom:1px solid var(--border);padding:9px 10px;text-align:left;}
+  table.src th{color:var(--muted);font-weight:600;font-size:13px;}
+  table.src tr.sum td{font-weight:700;border-top:2px solid var(--border);border-bottom:none;}
+  table.meta{width:100%;border-collapse:collapse;font-size:14px;margin-top:16px;}
+  table.meta th,table.meta td{border-top:1px solid var(--border);padding:7px 10px;text-align:left;}
+  table.meta th{width:120px;color:var(--muted);font-weight:600;}
+  .lv{
+    display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;
+    background:var(--chip);color:var(--muted);white-space:nowrap;
+  }
+  .lv-1{background:#e6f7ea;color:#2f9e44;}
+  .lv-2{background:#eef1f4;color:#656d76;}
+  .lv-3{background:#fff0f0;color:#e03131;}
+  .weights{margin-top:22px;}
+  .weights h4{margin:0 0 10px;font-size:14px;color:var(--muted);font-weight:700;}
+  footer.dis{
+    color:var(--muted);font-size:13px;padding:18px 32px;background:var(--card);
+    border:1px solid var(--border);border-radius:14px;
+  }
+  .muted{color:var(--muted);}
+  @media (max-width:720px){
+    body{padding:16px 10px 40px;}
+    header.top,.panel,footer.dis{padding:20px 18px;}
+    .score-grid{gap:16px;}
+    .radar{width:100%;}
+  }
+  @media print{
+    body{background:#fff;padding:0;}
+    header.top,.panel,.advice,footer.dis{break-inside:avoid;box-shadow:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="chips">
+      <span class="chip accent">玩家选购视角</span>
+      <span class="chip">数据截至 2026-11-26</span>
+    </div>
+    <h1 class="title">拉屎大作战</h1>
+    <p class="subtitle">自研 H5 ｜ Web ｜ 2026-11-26 实测版 ｜ F2P 无内购</p>
+    <div class="verdict">演出精致但玩法单薄，解压可玩、深度别指望</div>
+    <table class="meta"><tbody><tr><th>平台</th><td>Web H5（手机浏览器 / 桌面浏览器）</td></tr><tr><th>付费模式</th><td>F2P（免费，无内购、无广告）</td></tr><tr><th>开发商</th><td>用户自研（AI 协作开发）</td></tr><tr><th>发售日</th><td>未获取（无公开发布记录）</td></tr><tr><th>当前版本</th><td>2026-11-26 部署版（GitHub main 9cb7df1）</td></tr><tr><th>价格</th><td>免费</td></tr></tbody></table>
+  </header>
+
+  
+
+  <section class="panel">
+    <h2 class="sec">综合评分</h2>
+    <div class="score-grid">
+      <div class="score-box">
+        <div class="score-num">6.9</div>
+        <div class="score-den">/ 10 综合分</div>
+        <div><span class="tag t-c">及格挑人</span></div>
+      </div>
+      <div><svg class="radar" viewBox="0 0 480 410" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="六维评分雷达图">
+<polygon points="240.0,179.0 262.5,192.0 262.5,218.0 240.0,231.0 217.5,218.0 217.5,192.0" fill="none" stroke="#dfe3e8" stroke-width="1"/>
+<polygon points="240.0,153.0 285.0,179.0 285.0,231.0 240.0,257.0 195.0,231.0 195.0,179.0" fill="none" stroke="#dfe3e8" stroke-width="1"/>
+<polygon points="240.0,127.0 307.5,166.0 307.5,244.0 240.0,283.0 172.5,244.0 172.5,166.0" fill="none" stroke="#dfe3e8" stroke-width="1"/>
+<polygon points="240.0,101.0 330.1,153.0 330.1,257.0 240.0,309.0 149.9,257.0 149.9,153.0" fill="none" stroke="#dfe3e8" stroke-width="1"/>
+<polygon points="240.0,75.0 352.6,140.0 352.6,270.0 240.0,335.0 127.4,270.0 127.4,140.0" fill="none" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="240.0" y2="75.0" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="352.6" y2="140.0" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="352.6" y2="270.0" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="240.0" y2="335.0" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="127.4" y2="270.0" stroke="#dfe3e8" stroke-width="1"/>
+<line x1="240.0" y1="205.0" x2="127.4" y2="140.0" stroke="#dfe3e8" stroke-width="1"/>
+<text x="245.0" y="182.0" class="radar-tick">2</text>
+<text x="245.0" y="156.0" class="radar-tick">4</text>
+<text x="245.0" y="130.0" class="radar-tick">6</text>
+<text x="245.0" y="104.0" class="radar-tick">8</text>
+<text x="245.0" y="78.0" class="radar-tick">10</text>
+<polygon points="240.0,120.5 330.1,153.0 307.5,244.0 240.0,289.5 155.6,253.8 161.2,159.5" fill="rgba(232,89,12,0.18)" stroke="#e8590c" stroke-width="2.5" stroke-linejoin="round"/>
+<circle cx="240.0" cy="120.5" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<circle cx="330.1" cy="153.0" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<circle cx="307.5" cy="244.0" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<circle cx="240.0" cy="289.5" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<circle cx="155.6" cy="253.8" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<circle cx="161.2" cy="159.5" r="4" fill="#fff" stroke="#e8590c" stroke-width="2.5"/>
+<text x="240.0" y="49.0" class="radar-label" text-anchor="middle">玩法设计 <tspan class="radar-val">6.5</tspan></text>
+<text x="378.6" y="129.0" class="radar-label" text-anchor="start">画面表现 <tspan class="radar-val">8.0</tspan></text>
+<text x="378.6" y="289.0" class="radar-label" text-anchor="start">剧情叙事 <tspan class="radar-val">6.0</tspan></text>
+<text x="240.0" y="369.0" class="radar-label" text-anchor="middle">音效音乐 <tspan class="radar-val">6.5</tspan></text>
+<text x="101.4" y="289.0" class="radar-label" text-anchor="end">技术优化 <tspan class="radar-val">7.5</tspan></text>
+<text x="101.4" y="129.0" class="radar-label" text-anchor="end">性价比 <tspan class="radar-val">7.0</tspan></text>
+</svg></div>
+      <div class="bars"><div class="bar-row"><span class="bar-name">玩法设计</span><span class="bar-track"><i style="width:65.0%"></i></span><span class="bar-val">6.5</span></div>
+<div class="bar-row"><span class="bar-name">画面表现</span><span class="bar-track"><i style="width:80.0%"></i></span><span class="bar-val">8.0</span></div>
+<div class="bar-row"><span class="bar-name">剧情叙事</span><span class="bar-track"><i style="width:60.0%"></i></span><span class="bar-val">6.0</span></div>
+<div class="bar-row"><span class="bar-name">音效音乐</span><span class="bar-track"><i style="width:65.0%"></i></span><span class="bar-val">6.5</span></div>
+<div class="bar-row"><span class="bar-name">技术优化</span><span class="bar-track"><i style="width:75.0%"></i></span><span class="bar-val">7.5</span></div>
+<div class="bar-row"><span class="bar-name">性价比</span><span class="bar-track"><i style="width:70.0%"></i></span><span class="bar-val">7.0</span></div></div>
+    </div>
+    <div class="weights">
+      <h4>综合分构成（玩家选购视角权重）</h4>
+      <table class="src"><thead><tr><th>维度</th><th>权重</th><th>得分</th><th>加权贡献</th></tr></thead><tbody><tr><td>玩法设计</td><td>30%</td><td>6.5</td><td>1.95</td></tr><tr><td>画面表现</td><td>15%</td><td>8.0</td><td>1.20</td></tr><tr><td>剧情叙事</td><td>15%</td><td>6.0</td><td>0.90</td></tr><tr><td>音效音乐</td><td>10%</td><td>6.5</td><td>0.65</td></tr><tr><td>技术优化</td><td>15%</td><td>7.5</td><td>1.12</td></tr><tr><td>性价比</td><td>15%</td><td>7.0</td><td>1.05</td></tr><tr class="sum"><td>合计</td><td>100%</td><td>—</td><td>6.88</td></tr></tbody></table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="sec">核心亮点与主要问题</h2>
+    <div class="two">
+      <div>
+        <p class="subhead">核心亮点</p>
+        <ul class="pros"><li>「捏出即飞走」的核心演出：真抛物线 + 挤压弹射 + 落地回弹 + 飞出瞬间惊奇脸（320ms），把一次长按做出了完整的物理爽感——实机抓帧可见带脸屎四散粒子飞出</li><li>四段软体 SVG 弹簧物理：每层独立形变、波从底传到尖，静止时隔帧写入，性能与表现兼顾，是这个体量小游戏里少见的用心</li><li>零付费零广告：9 款皮肤全部靠分数/连击解锁，无内购无 P2W，账号与云排行榜免费开放</li><li>细节完整性：静音持久化、键盘操作、reduced-motion 降级、页面隐藏暂停、双视口适配、本地存档，都有实机验证</li></ul>
+      </div>
+      <div>
+        <p class="subhead">主要问题</p>
+        <ul class="cons"><li>玩法深度是硬伤：无失败条件、无目标关卡、无时间压力，长按不放即可持续刷分（实测 7 秒 7 分），策略只剩「要不要松手」</li><li>皮肤解锁曲线陡：9 款皮肤初始仅 1 款可用，门槛从最高分 10 一路到 300（或连击 30），休闲玩家很难见到后几款</li><li>飞走后角色停在扁椭圆种子态，静止待机观感像一滩饼，缺少待机呼吸感，长时间挂机时尤其明显</li><li>本地加载 3052ms（含云 SDK），对即点即玩的超休闲品类偏慢；排行榜采样帧仍显示「加载中…」，依赖 iframe 链路</li></ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="sec">适合谁 / 不适合谁</h2>
+    <div class="aud"><div class="aud-col"><h4>适合谁</h4><ul class="pros"><li>每天有碎片时间、想无脑解压几分钟的上班族或学生</li><li>对「屎」主题恶趣味有共鸣、愿意为收集皮肤反复刷分的轻度玩家</li><li>想随手点开、不追求胜负、只要一点即时反馈的人</li></ul></div><div class="aud-col"><h4>不适合谁</h4><ul class="cons"><li>追求策略深度、关卡挑战或失败压力的硬核玩家</li><li>期待剧情、角色塑造或世界观的重度玩家</li><li>对加载延迟敏感、要求秒开即玩的玩家</li></ul></div></div>
+  </section>
+
+  <section class="panel">
+    <h2 class="sec">维度详评</h2>
+    <section class="dim"><header><h3>玩法设计</h3><span class="dim-score">6.5</span><span class="bar-track small"><i style="width:65.0%"></i></span></header><p>核心循环极简：按住蓄力约 0.87 秒 → 捏出完整一坨飞出落地 +1 分 → 松手未憋满则退回。实机短按 50ms 计 0 分、长按 1 秒计 1 分、连续长按 6 秒累计 7 分，规则一致且可预期。</p><p>反馈设计是强项：飞出走 JS 真抛物线（y 先升后降）、内层 CSS 挤压弹射（压扁→弹起→落地回弹）、飞出瞬间带惊奇脸 320ms、粒子爆发 838 个非透明像素——把一次点击做出了完整的物理演出。</p><p>但策略深度几乎为零：没有失败条件、没有目标关卡、没有时间压力，长按不放就能一直刷分，唯一变量只是「要不要松手」。连击按 1.15 秒窗口累计，实测到连击 7，但采样帧里连击激活 class 未捕捉到，反馈存在感偏弱。重复可玩性全靠 9 款皮肤收集支撑。</p></section><section class="dim"><header><h3>画面表现</h3><span class="dim-score">8.0</span><span class="bar-track small"><i style="width:80.0%"></i></span></header><p>四段软体 SVG 角色是明显记忆点：每层独立弹簧形变，波从堆底传到顶尖，静止时隔帧写入省性能；9 款皮肤是手工调色板而非滤镜，层次读得出来。</p><p>本轮新增的飞出演出在超休闲品类里属精致：真抛物线 + 挤压弹射 + 落地回弹 + 带脸屎堆（每坨都会眨眼），暖棕色调统一，hint/toast/banner 反馈齐全。手机 390×844 与桌面 1280×820 双视口实测适配正常，游戏区居中。</p><p>扣分点：飞走后角色本体停在扁椭圆「种子态」，静止待机时观感像一滩饼，缺少待机呼吸感。</p></section><section class="dim"><header><h3>剧情叙事（按包装与氛围完整度评分）</h3><span class="dim-score">6.0</span><span class="bar-track small"><i style="width:60.0%"></i></span></header><p>本作无叙事内容，此项按包装与氛围完整度评分。</p><p>「拉屎大作战」主题贯彻统一：标题、按钮文案（皮肤/排行/重新开始）、9 款皮肤命名（经典屎/黄金屎/墨镜屎/超人屎）、提示语（按住不放·憋出来·松手退回）、toast 文案都在同一恶趣味语境里，氛围完整。</p><p>但仅为薄包装，没有世界观、角色塑造或叙事节奏，不提供剧情向体验。</p></section><section class="dim"><header><h3>音效音乐</h3><span class="dim-score">6.5</span><span class="bar-track small"><i style="width:65.0%"></i></span></header><p>WebAudio 实时合成，无外部音频文件：点击音随连击升高（sfxTap）、升级琶音（sfxLevel）、解锁音（sfxUnlock），有静音开关且 localStorage 持久化（实测点击后 ls_mute=1、图标切 🔇）。</p><p>缺点是只有 3 类短音效、无 BGM，声音层次单薄；连击 5 的倍数有 12ms 震动反馈，但整体听感未达到「记忆点」级别。</p></section><section class="dim"><header><h3>技术优化</h3><span class="dim-score">7.5</span><span class="bar-track small"><i style="width:75.0%"></i></span></header><p>实机 0 pageerror、0 console error；本地+线上（iframe 短地址云端模式）均验证通过。细节到位：页面隐藏暂停动画并掐计时器、prefers-reduced-motion 降级、键盘 Space/Enter/↓ 可操作（实测键盘 1 秒 +1 分）、屎堆上限 20 坨防无限堆积、重置清空、本地最高分/皮肤/静音写入 localStorage。</p><p>扣分点：本地加载 3052ms（含 CloudBase SDK 初始化），对超休闲即点即玩品类偏慢；排行榜面板在采样帧仍显示「加载中…」，云端拉取体验依赖 iframe 链路。</p></section><section class="dim"><header><h3>性价比</h3><span class="dim-score">7.0</span><span class="bar-track small"><i style="width:70.0%"></i></span></header><p>F2P 完全免费，无内购、无广告、无付费墙——9 款皮肤全靠最高分和连击解锁，不存在 P2W，这条底线值得肯定。云账号 + 跨设备排行榜免费用。</p><p>但内容量非常薄：单一机制、无关卡无目标，靠刷分和皮肤收集支撑长线。回答「要不要投入时间」：适合每天碎片时间解压几分钟，不值得作为主力游戏长期投入。</p></section>
+  </section>
+
+  <div class="advice">
+    <div class="lvl">购买建议：建议零氪</div>
+    <p>完全免费、无内购无广告，直接玩即可，不需要也不存在充钱。建议当作碎片时间的解压小玩具：每天随手捏几坨、刷刷连击、攒分解锁皮肤；不要把它当主力游戏长期投入——单一机制决定了它撑不起重度游玩。</p>
+  </div>
+
+  <section class="extra"><h3>实机试玩记录（2026-11-26，一手数据）</h3><p>测试环境：Playwright + chrome-headless-shell，手机视口 390×844（hasTouch）、桌面视口 1280×820，本地静态服务与线上短地址 iframe 双链路。</p><p>客观数据：加载至可交互 3052ms；短按 50ms → 0 分；长按 1 秒 → 1 分、落地 1 坨、飘字 +1；连续长按 6 秒 → 累计 7 分、屎堆 7 坨（每坨带脸）、连击文本到「连击7」；皮肤面板 9 款、初始解锁 1 款；锁定皮肤点击提示「最高分达到 10 才能解锁『黄金屎』」；静音开关切换后 ls_mute=1；排行榜本地/云端模式面板可开；重置后分数 0、屎堆清空；键盘 Space 长按 1 秒 → +1 分；桌面游戏区 480×820 居中。</p><p>错误：pageerror 0、console error 0。线上短地址 iframe 验证：云端模式长按 4.4 秒出 5 坨带脸屎，0 报错。</p><p>外部评分：Steam / Metacritic / 豆瓣均无该自研小游戏条目，全部标注「未获取」，不参与评分。</p></section>
+
+  <section class="panel">
+    <h2 class="sec">数据来源</h2>
+    <table class="src"><thead><tr><th>指标</th><th>数值</th><th>可信度</th><th>采集日期</th><th>备注</th></tr></thead><tbody><tr><td>实机试玩（手机端 390×844）</td><td>加载 3052ms；短按 0 分/长按 1 秒 +1 分；7 秒 7 分、屎堆 7 坨带脸；0 pageerror/0 console error</td><td><span class="lv lv-1">一手</span></td><td>2026-11-26</td><td>Playwright 真机本地试玩，第一手体验，评分主要依据</td></tr><tr><td>实机试玩（桌面端 1280×820）</td><td>游戏区 480×820 居中，适配正常；键盘 Space 长按可计分</td><td><span class="lv lv-1">一手</span></td><td>2026-11-26</td><td>Playwright 真机本地试玩</td></tr><tr><td>线上版本验证（短地址 iframe）</td><td>云端模式长按 4.4 秒出 5 坨带脸屎，0 报错</td><td><span class="lv lv-1">一手</span></td><td>2026-11-26</td><td>kegaiisyou.github.io/la-shi/ 实机验证，CloudBase iframe 链路</td></tr><tr><td>皮肤解锁与机制数值</td><td>9 款皮肤，初始解锁 1 款；门槛 10/30/60/100/150/200/250(连击15)/300(连击30)；连击窗口 1150ms</td><td><span class="lv lv-1">一手</span></td><td>2026-11-26</td><td>本地源码审阅 + 皮肤面板实测交叉确认</td></tr><tr><td>Steam / Metacritic / 豆瓣外部评分</td><td>未获取</td><td><span class="lv lv-3">存疑</span></td><td>2026-11-26</td><td>自研免费 H5 小游戏，无商业平台条目；网络自检 store.steampowered.com 可达但无本作数据。此项不参与评分。</td></tr></tbody></table>
+  </section>
+
+  <footer class="dis">
+    <strong>免责声明</strong>
+    <p>本次为亲真实机试玩（Playwright + chrome-headless-shell，手机与桌面双视口，本地与线上双链路），非云玩家或媒体转述；已记录页面错误、帧状态、交互结果与存档数据。外部评分数据全部未获取（本作为自研 H5 小游戏，无 Steam/Metacritic/豆瓣条目），报告中无任何外部评分数值。六维分数与综合分属于基于第一手体验的主观判断，非客观测量；客观事实（加载耗时、计分规则、皮肤数量、错误数）与主观评分在报告中分栏呈现。品类为超休闲长按小游戏、无叙事，剧情维度按「包装与氛围完整度」改评。评分基于 2026-11-26 部署版本（GitHub main 9cb7df1），可能随后续更新变化。</p>
+  </footer>
+
+</div>
+</body>
+</html>

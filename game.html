@@ -72,6 +72,7 @@
     flex: 0 0 auto; line-height: 1;
   }
   .icon:active { transform: translateY(2px); box-shadow: none; }
+  .hud-acts { display: flex; gap: 8px; flex: 0 0 auto; }
 
   .userbar {
     display: flex; align-items: center; justify-content: space-between;
@@ -370,6 +371,43 @@
   .card .close { width: 100%; margin-top: 12px; background: transparent; color: #96734E; box-shadow: none; font-size: 12.5px; }
   .card .close:active { box-shadow: none; transform: scale(.98); }
 
+  /* ---------- 支持作者 ---------- */
+  .support-note { font-size: 12.5px; color: var(--ink2); text-align: center; line-height: 1.7; margin: -2px 0 14px; }
+  .support-main {
+    display: block; width: 100%; padding: 14px; margin-bottom: 12px;
+    border-radius: 13px; text-align: center; text-decoration: none;
+    font-size: 15px; font-weight: 700; letter-spacing: .5px; color: #FFF8EC;
+    background: linear-gradient(180deg, #E9A33C 0%, #C06A22 100%);
+    box-shadow: 0 3px 0 #8A4512, 0 7px 14px rgba(79,46,20,.24);
+  }
+  .support-main:active { transform: translateY(3px); box-shadow: none; }
+  .support-qrs { display: flex; gap: 10px; }
+  .support-qr {
+    flex: 1; text-align: center; padding: 10px 8px; border-radius: 14px;
+    background: #FFFDF9; border: 1.5px solid #EDD9B8;
+  }
+  .support-qr img {
+    width: 100%; max-width: 140px; aspect-ratio: 1 / 1; object-fit: contain;
+    display: block; margin: 0 auto 6px; border-radius: 8px;
+  }
+  .support-qr b { display: block; font-size: 12px; color: #6B4222; }
+  .support-qr small { display: block; font-size: 10px; color: #A2855F; margin-top: 3px; }
+  .support-empty { text-align: center; font-size: 12.5px; color: var(--ink2); line-height: 2; padding: 18px 0; }
+  .support-tip { font-size: 10.5px; color: #A2855F; text-align: center; margin: 12px 0 0; line-height: 1.6; }
+
+  /* ---------- 内嵌广告位 ---------- */
+  .ad-banner {
+    display: none; width: 100%; max-width: 340px; margin: 10px auto 0;
+    border-radius: 11px; overflow: hidden; text-decoration: none;
+    border: 1px solid rgba(150,105,60,.22); background: rgba(255,253,249,.85);
+    box-shadow: 0 3px 10px rgba(120,80,40,.12);
+  }
+  .ad-banner img { display: block; width: 100%; height: auto; max-height: 64px; object-fit: contain; }
+  .ad-banner .ab-text { display: block; font-size: 10px; color: #A2855F; text-align: center; padding: 3px 6px; }
+  .ad-card { text-align: center; }
+  .ad-card .ad-pic { display: block; width: 100%; max-height: 52vh; object-fit: contain; border-radius: 12px; background: #F7EFE1; }
+  .ad-card .ad-txt { font-size: 12px; color: var(--ink2); margin: 10px 0 4px; line-height: 1.6; }
+
   /* ---------- 皮肤面板 ---------- */
   .skin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
   .skin-item {
@@ -484,7 +522,10 @@
         <h1>拉屎大作战</h1>
         <div class="sub">按住不放 · 憋出来 · 松手退回</div>
       </div>
-      <button id="soundBtn" class="icon" aria-label="音效开关">🔊</button>
+      <div class="hud-acts">
+        <button id="supportBtn" class="icon" aria-label="支持作者" title="支持作者">💖</button>
+        <button id="soundBtn" class="icon" aria-label="音效开关">🔊</button>
+      </div>
     </div>
     <div class="userbar">
       <span id="userinfo">未登录 <span class="badge" id="mode">本地</span></span>
@@ -522,11 +563,33 @@
       <button id="rank" class="ghost">🏆 排行</button>
       <button id="reset" class="ghost">重新开始</button>
     </div>
+    <a id="adBanner" class="ad-banner"></a>
   </footer>
 
   <div class="banner" id="banner" aria-hidden="true"></div>
   <div class="toast" id="toast" aria-hidden="true"></div>
   <div class="vig" aria-hidden="true"></div>
+</div>
+
+<!-- 内嵌广告（插屏 / 开屏 / 复活共用） -->
+<div class="overlay" id="adOverlay">
+  <div class="card ad-card">
+    <h2 id="adTitle">赞助</h2>
+    <a id="adLink"><img id="adImg" class="ad-pic" src="" alt="广告"></a>
+    <div id="adText" class="ad-txt"></div>
+    <button id="adClose" class="primary">跳过</button>
+  </div>
+</div>
+
+<!-- 支持作者 -->
+<div class="overlay" id="supportOverlay">
+  <div class="card">
+    <h2>💖 支持一下</h2>
+    <div class="support-note" id="supportNote"></div>
+    <div id="supportBody"></div>
+    <div class="support-tip">游戏免费、无广告。你的支持就是更新的动力。</div>
+    <button id="supportClose" class="close">关闭</button>
+  </div>
 </div>
 
 <!-- 皮肤 -->
